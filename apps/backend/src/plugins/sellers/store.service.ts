@@ -2,20 +2,27 @@ import { Inject, Injectable } from "@nestjs/common";
 import { DEFAULT_CHANNEL_CODE } from "@vendure/common/lib/shared-constants";
 import {
   AdministratorService,
+  type ID,
   Channel,
   ChannelService,
   CurrencyCode,
+  defaultShippingCalculator,
+  defaultShippingEligibilityChecker,
   LanguageCode,
+  manualFulfillmentHandler,
+  PaymentMethodService,
   Permission,
   type RequestContext,
   RoleService,
   SellerService,
+  ShippingMethodService,
   StockLocationService,
   TransactionalConnection,
   UserInputError,
 } from "@vendure/core";
 import { type CurrencyCode as SporaCurrency } from "@spora/shared";
 import { type DesignStyle } from "@spora/themes";
+import { cashOnDeliveryHandler } from "../payments/cash-on-delivery";
 
 export type SellerStatus = "pendiente" | "activo" | "suspendido";
 export const sellerStatuses: SellerStatus[] = ["pendiente", "activo", "suspendido"];
@@ -68,6 +75,8 @@ export class StoreService {
     @Inject(StockLocationService) private stockLocations: StockLocationService,
     @Inject(RoleService) private roles: RoleService,
     @Inject(AdministratorService) private administrators: AdministratorService,
+    @Inject(ShippingMethodService) private shippingMethods: ShippingMethodService,
+    @Inject(PaymentMethodService) private paymentMethods: PaymentMethodService,
   ) {}
 
   /**
@@ -113,7 +122,53 @@ export class StoreService {
       permissions: SELLER_PERMISSIONS,
     });
     await this.administrators.create(ctx, { ...input.administrator, roleIds: [role.id] });
+    await this.createDefaultMethods(ctx, created.id, slug, input.baseCurrency);
     return created;
+  }
+
+  /**
+   * Toda tienda nueva puede vender desde el primer día: envío propio con tarifa fija, retiro en local y contra
+   * entrega. El comercio los ajusta en el Admin UI. (Vendure los deja también en el canal por defecto.)
+   */
+  private async createDefaultMethods(ctx: RequestContext, channelId: ID, slug: string, currency: SporaCurrency) {
+    const shipping = [
+      {
+        code: "envio",
+        name: "Envío a domicilio",
+        description: "Entrega en 2 a 4 días hábiles.",
+        rate: currency === "CRC" ? 250000 : 500,
+      },
+      { code: "retiro", name: "Retiro en local", description: "Coordine el retiro con la tienda.", rate: 0 },
+    ];
+    const shippingMethodIds: ID[] = [];
+    for (const method of shipping) {
+      const created = await this.shippingMethods.create(ctx, {
+        code: `${slug}-${method.code}`,
+        fulfillmentHandler: manualFulfillmentHandler.code,
+        checker: { code: defaultShippingEligibilityChecker.code, arguments: [{ name: "orderMinimum", value: "0" }] },
+        calculator: {
+          code: defaultShippingCalculator.code,
+          arguments: [
+            { name: "rate", value: String(method.rate) },
+            { name: "includesTax", value: "include" },
+            { name: "taxRate", value: "0" },
+          ],
+        },
+        translations: [{ languageCode: LanguageCode.es, name: method.name, description: method.description }],
+      });
+      shippingMethodIds.push(created.id);
+    }
+    await this.shippingMethods.assignShippingMethodsToChannel(ctx, { shippingMethodIds, channelId });
+
+    const cod = await this.paymentMethods.create(ctx, {
+      code: `${slug}-contra-entrega`,
+      enabled: true,
+      handler: { code: cashOnDeliveryHandler.code, arguments: [] },
+      translations: [
+        { languageCode: LanguageCode.es, name: "Contra entrega", description: "Pague en efectivo o SINPE al recibir." },
+      ],
+    });
+    await this.paymentMethods.assignPaymentMethodsToChannel(ctx, { paymentMethodIds: [cod.id], channelId });
   }
 
   /** Estado del comercio dueño del canal con este token; `null` para el canal del marketplace o un token desconocido. */

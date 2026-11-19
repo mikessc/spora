@@ -3,7 +3,10 @@ import { fileURLToPath } from "node:url";
 import { AssetServerPlugin } from "@vendure/asset-server-plugin";
 import { AdminUiPlugin } from "@vendure/admin-ui-plugin";
 import { DefaultJobQueuePlugin, DefaultSchedulerPlugin, type VendureConfig } from "@vendure/core";
+import { AccountPlugin } from "./plugins/account/account.plugin";
 import { CatalogPlugin } from "./plugins/catalog/catalog.plugin";
+import { CurrencyPlugin } from "./plugins/currency/currency.plugin";
+import { cashOnDeliveryHandler } from "./plugins/payments/cash-on-delivery";
 import { SellersPlugin } from "./plugins/sellers/sellers.plugin";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
@@ -25,6 +28,8 @@ export const config: VendureConfig = {
   },
   authOptions: {
     tokenMethod: ["bearer", "cookie"],
+    // MVP sin correos reales (MVP.md): la cuenta queda activa al registrarse.
+    requireVerification: false,
     superadminCredentials: {
       identifier: env("SUPERADMIN_USER", "superadmin"),
       password: env("SUPERADMIN_PASSWORD", "superadmin"),
@@ -45,7 +50,7 @@ export const config: VendureConfig = {
     synchronize: false,
     migrations: [path.join(dir, "migrations/*.{ts,js}")],
   },
-  paymentOptions: { paymentMethodHandlers: [] },
+  paymentOptions: { paymentMethodHandlers: [cashOnDeliveryHandler] },
   importExportOptions: { importAssetsDir: path.join(dir, "../seed/assets") },
   plugins: [
     AssetServerPlugin.init({
@@ -59,5 +64,7 @@ export const config: VendureConfig = {
     AdminUiPlugin.init({ route: "admin", port: Number(env("ADMIN_UI_PORT", "3002")) }),
     SellersPlugin,
     CatalogPlugin,
+    CurrencyPlugin,
+    AccountPlugin,
   ],
 };

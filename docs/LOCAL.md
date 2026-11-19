@@ -19,7 +19,9 @@ Para empezar de cero: `pnpm db:reset && pnpm seed`.
 | Tienda demo (portada) | <http://tienda-demo.spora.localhost:4000/> |
 | Categoría con filtros | <http://tienda-demo.spora.localhost:4000/categoria/camisetas?color=negro> |
 | Ficha de producto | <http://tienda-demo.spora.localhost:4000/producto/camiseta-sibu> |
-| Carrito | <http://tienda-demo.spora.localhost:4000/carrito> |
+| Carrito y pago | <http://tienda-demo.spora.localhost:4000/carrito> → `/checkout/datos` |
+| Cuenta Spora | `/cuenta/ingresar`, `/cuenta/registro`, `/cuenta` en cualquier tienda |
+| Tienda en USD | <http://cafe-sur.spora.localhost:4000/> |
 | Otro estilo (vista previa) | agregar `?estilo=` con `suave`, `minimal`, `vibrante`, `editorial` o `pop` a cualquier página |
 | Sitemap / robots | <http://tienda-demo.spora.localhost:4000/sitemap.xml>, `/robots.txt` |
 | Admin UI (comercio y Spora) | <http://localhost:3000/admin> |
@@ -33,7 +35,9 @@ curl sin configurar nada.
 | Rol | Usuario | Clave |
 | --- | --- | --- |
 | Admin de Spora (superadmin) | `superadmin` | `superadmin` |
-| Comercio "Tienda Demo" (solo su canal) | `demo@spora.localhost` | `demo1234` |
+| Comercio "Tienda Demo" (CRC, solo su canal) | `demo@spora.localhost` | `demo1234` |
+| Comercio "Café Sur" (USD, solo su canal) | `cafe@spora.localhost` | `cafe1234` |
+| Cliente | se crea en `/cuenta/registro` de cualquier tienda | |
 
 ## Tareas comunes
 - **Tema de la tienda:** Admin UI (como el comercio) → Configuración → Canales → la tienda → pestaña "Tienda": estilo,
@@ -46,6 +50,10 @@ curl sin configurar nada.
   los campos "Categoría global" y "Marca".
 - **Cambiar el esquema** (entidades o custom fields): `pnpm --filter @spora/backend migration:generate <nombre>` y
   commitear la migración de `apps/backend/src/migrations`.
+
+## Tipo de cambio
+Sin credenciales del BCCR se usa la tasa fija `BCCR_SIMULATED_RATE` (₡515,00 por defecto). Para la real, poner
+`BCCR_EMAIL` y `BCCR_TOKEN` en `apps/backend/.env` (suscripción gratuita del BCCR).
 
 ## Chequeos
 - `pnpm check`: formato, tipos, tests (incluye Vendure en memoria con sql.js) y lint. No necesita servidores.

@@ -5,7 +5,8 @@ import { div, form, h1, input, main, p, section } from "sibujs";
 import { island } from "sibujs/ssr";
 import { islands } from "./islands";
 
-export function ProductPage(product: Product) {
+/** `exchangeRate`: colones por dólar del día, para el precio aproximado en la otra moneda. */
+export function ProductPage(product: Product, exchangeRate: string | null) {
   const initial = product.variants.find((v) => v.stockLevel !== "OUT_OF_STOCK") ?? product.variants[0];
   const initialVariant = initial
     ? { id: initial.id, featuredAssetId: initial.featuredAssetId, available: initial.stockLevel !== "OUT_OF_STOCK" }
@@ -28,6 +29,7 @@ export function ProductPage(product: Product) {
           optionGroups: product.optionGroups,
           variants: product.variants,
           initialVariantId: initial?.id ?? "",
+          exchangeRate,
         }),
         island("add-to-cart", islands["add-to-cart"], { variant: initialVariant }),
       ]),

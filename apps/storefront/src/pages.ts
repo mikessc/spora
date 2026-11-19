@@ -117,6 +117,7 @@ export function CartPage(cart: Cart | null, notice?: string) {
     div("cart__summary", [
       p("cart__total", [span("Total "), span("cart__total-amount", formatMoney(cart.total))]),
       p("cart__note", "Impuestos incluidos. El envío se calcula al pagar."),
+      a({ class: "cart__checkout", href: "/checkout/datos" }, "Ir a pagar"),
     ]),
   ]);
 }
@@ -131,3 +132,10 @@ export function PolicyPageView(store: Store, page: PolicyPage) {
 export function NotFoundPage(title: string, text: string) {
   return main("not-found", [h1(title), p(text), a({ href: "/" }, "Volver al inicio")]);
 }
+
+/** Resultado de página 404 dentro de la tienda. */
+export const notFound = (text: string) => ({
+  content: () => NotFoundPage("No encontrado", text),
+  meta: { title: "No encontrado", noindex: true },
+  status: 404,
+});

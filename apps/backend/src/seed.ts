@@ -1,30 +1,33 @@
-// Datos de ejemplo. Idempotente: si la tienda demo ya existe, no hace nada.
+// Datos de ejemplo. Idempotente: lo global se crea una vez y cada tienda solo si no existe.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   bootstrap,
+  Channel,
   ChannelService,
   CollectionService,
   CurrencyCode,
   GlobalSettingsService,
   type InitialData,
   LanguageCode,
-  ProductOptionGroup,
   ProductOptionGroupService,
   productIdCollectionFilter,
   ProductService,
+  ProductVariantPrice,
+  type RequestContext,
   RequestContextService,
   runMigrations,
   TransactionalConnection,
   UserService,
 } from "@vendure/core";
 import { importProductsFromCsv, populateInitialData } from "@vendure/core/cli/index.js";
-import { slugify } from "@spora/shared";
+import { type CommonAttribute, type CurrencyCode as Currency, isCommonAttribute, slugify } from "@spora/shared";
+import type { DesignStyle } from "@spora/themes";
+import { MarketplaceCategory } from "./plugins/catalog/entities";
 import { CatalogService } from "./plugins/catalog/catalog.service";
 import { StoreService } from "./plugins/sellers/store.service";
 import { config } from "./vendure-config";
 
-const DEMO = "tienda-demo";
 const dir = path.dirname(fileURLToPath(import.meta.url));
 
 const initialData: InitialData = {
@@ -45,37 +48,87 @@ const categories: Tree = [
   ["Artesanía", [["Cerámica"], ["Textiles"]]],
   ["Tecnología", [["Audio"], ["Accesorios para celular"]]],
 ];
+const brands = ["Sibú", "Café Sur"];
+
+interface StoreSeed {
+  slug: string;
+  name: string;
+  currency: Currency;
+  style: DesignStyle;
+  admin: { email: string; password: string; firstName: string; lastName: string };
+  theme: Record<string, string>;
+  /** [nombre, categoría global, slugs de productos] */
+  collections: [string, string, string[]][];
+}
+
+const stores: StoreSeed[] = [
+  {
+    slug: "tienda-demo",
+    name: "Tienda Demo",
+    currency: "CRC",
+    style: "suave",
+    admin: { email: "demo@spora.localhost", password: "demo1234", firstName: "Comercio", lastName: "Demo" },
+    theme: {
+      primaryColor: "#1d6b4f",
+      tagline: "Ropa de algodón hecha en Costa Rica",
+      about: "Somos un taller familiar en San José. Cortamos y cosemos cada pieza en pequeños lotes.",
+      contactEmail: "hola@tienda-demo.cr",
+      contactPhone: "+506 8888 0000",
+      shippingPolicy: "Enviamos a todo el país en 2 a 4 días hábiles.\nRetiro gratis en el taller.",
+      returnsPolicy: "Cambios de talla dentro de los 15 días, con la prenda sin usar y su etiqueta.",
+      privacyPolicy: "Usamos sus datos solo para preparar y enviar su pedido. No los compartimos con terceros.",
+    },
+    collections: [
+      ["Camisetas", "moda-hombre-camisetas", ["camiseta-sibu", "camiseta-volcan"]],
+      ["Accesorios", "moda-accesorios", ["gorra-sibu"]],
+    ],
+  },
+  {
+    slug: "cafe-sur",
+    name: "Café Sur",
+    currency: "USD",
+    style: "editorial",
+    admin: { email: "cafe@spora.localhost", password: "cafe1234", firstName: "Lucía", lastName: "Solano" },
+    theme: {
+      primaryColor: "#6b4226",
+      font: "clasica",
+      tagline: "Café de altura, tostado cada semana",
+      about: "Compramos directo a fincas de Tarrazú y Los Santos.",
+      contactEmail: "hola@cafesur.cr",
+      shippingPolicy: "Envíos a todo el país. Pedidos antes del mediodía salen el mismo día.",
+    },
+    collections: [["Café y chocolate", "cafe-y-alimentos", ["cafe-tarrazu", "chocolate-70"]]],
+  },
+];
 
 await runMigrations(config);
 const app = await bootstrap({ ...config, apiOptions: { ...config.apiOptions, port: 3999 } });
 try {
+  const connection = app.get(TransactionalConnection);
   const channels = app.get(ChannelService);
-  if ((await channels.getChannelFromToken(DEMO)).token === DEMO) {
-    console.log(`La tienda "${DEMO}" ya existe; nada que hacer.`);
-  } else {
-    const contexts = app.get(RequestContextService);
-    const superadmin = await app
-      .get(UserService)
-      .getUserByEmailAddress(
-        await contexts.create({ apiType: "admin" }),
-        config.authOptions.superadminCredentials!.identifier,
-      );
-    const ctx = await contexts.create({ apiType: "admin", user: superadmin });
-    const connection = app.get(TransactionalConnection);
+  const contexts = app.get(RequestContextService);
+  const users = app.get(UserService);
+  const identifier = config.authOptions.superadminCredentials!.identifier;
+  // Se recarga el superadmin cada vez: un usuario cargado antes de crear un canal no tiene permisos en él.
+  const adminCtx = async (channelOrToken?: string) => {
+    const user = await users.getUserByEmailAddress(await contexts.create({ apiType: "admin" }), identifier);
+    return contexts.create({ apiType: "admin", user, channelOrToken });
+  };
 
+  if (!(await connection.rawConnection.getRepository(MarketplaceCategory).count())) {
+    const ctx = await adminCtx();
     await app
       .get(GlobalSettingsService)
       .updateSettings(ctx, { availableLanguages: [LanguageCode.es, LanguageCode.en] });
     await populateInitialData(app, initialData);
-    // El importador CSV de Vendure 3.8 guarda los precios en la moneda del canal por defecto (FastImporterService),
-    // así que el canal por defecto (el del marketplace) también va en CRC.
+    // El importador CSV de Vendure 3.8 guarda los precios en la moneda del canal por defecto (FastImporterService):
+    // el canal por defecto (el del marketplace) va en CRC y las tiendas en USD se corrigen después de importar.
     const defaultChannel = await channels.getDefaultChannel(ctx);
     await channels.update(ctx, {
       id: defaultChannel.id,
       defaultCurrencyCode: CurrencyCode.CRC,
       availableCurrencyCodes: [CurrencyCode.CRC],
     });
-
     const catalog = app.get(CatalogService);
     const plant = async (tree: Tree, parentId: string | number | null) => {
       for (const [i, [name, children]] of tree.entries()) {
@@ -84,73 +137,17 @@ try {
       }
     };
     await plant(categories, null);
-    await catalog.approveBrand(ctx, (await catalog.proposeBrand(ctx, "Sibú")).id);
+    for (const name of brands) await catalog.approveBrand(ctx, (await catalog.proposeBrand(ctx, name)).id);
+    console.log("Datos globales: país, IVA, categorías y marcas.");
+  }
 
-    const store = await connection.withTransaction(ctx, (tx) =>
-      app.get(StoreService).createStore(tx, {
-        name: "Tienda Demo",
-        slug: DEMO,
-        baseCurrency: "CRC",
-        status: "activo",
-        administrator: {
-          firstName: "Comercio",
-          lastName: "Demo",
-          emailAddress: "demo@spora.localhost",
-          password: "demo1234",
-        },
-      }),
-    );
-
-    const result = await importProductsFromCsv(app, path.join(dir, "../seed/productos.csv"), LanguageCode.es, store);
-    // El importador no siempre reporta los errores de parseo: 0 importados también es un fallo.
-    if (result.errors?.length || !result.imported) throw new Error(`Importación fallida: ${result.errors?.join("\n")}`);
-
-    // El CSV no trae campos de grupos de opciones: se mapean aquí a los atributos comunes (camiseta-sibu-talla → talla).
-    const groups = app.get(ProductOptionGroupService);
-    for (const group of await connection.rawConnection.getRepository(ProductOptionGroup).find()) {
-      const attribute = group.code.split("-").pop() as "talla" | "color";
-      await groups.update(ctx, { id: group.id, customFields: { attribute } });
+  for (const seed of stores) {
+    if (await connection.rawConnection.getRepository(Channel).existsBy({ token: seed.slug })) {
+      console.log(`La tienda "${seed.slug}" ya existe.`);
+      continue;
     }
-    // Tema, textos y categorías propias de la tienda (mapeadas a las globales).
-    // Se vuelve a cargar el superadmin: el de arriba no conoce el canal recién creado.
-    const freshAdmin = await app.get(UserService).getUserById(ctx, superadmin!.id);
-    const storeCtx = await contexts.create({ apiType: "admin", user: freshAdmin, channelOrToken: DEMO });
-    await channels.update(storeCtx, {
-      id: store.id,
-      customFields: {
-        primaryColor: "#1d6b4f",
-        font: "sistema",
-        tagline: "Ropa de algodón hecha en Costa Rica",
-        about: "Somos un taller familiar en San José. Cortamos y cosemos cada pieza en pequeños lotes.",
-        contactEmail: "hola@tienda-demo.cr",
-        contactPhone: "+506 8888 0000",
-        shippingPolicy: "Enviamos a todo el país en 2 a 4 días hábiles.\nRetiro gratis en el taller.",
-        returnsPolicy: "Cambios de talla dentro de los 15 días, con la prenda sin usar y su etiqueta.",
-        privacyPolicy: "Usamos sus datos solo para preparar y enviar su pedido. No los compartimos con terceros.",
-      },
-    });
-    const productIds = async (...slugs: string[]) =>
-      Promise.all(slugs.map(async (slug) => (await app.get(ProductService).findOneBySlug(storeCtx, slug))!.id));
-    const collections: [string, string, string[]][] = [
-      ["Camisetas", "moda-hombre-camisetas", ["camiseta-sibu", "camiseta-volcan"]],
-      ["Accesorios", "moda-accesorios", ["gorra-sibu"]],
-    ];
-    for (const [name, marketplaceCategory, slugs] of collections) {
-      await app.get(CollectionService).create(storeCtx, {
-        translations: [{ languageCode: LanguageCode.es, name, slug: slugify(name), description: "" }],
-        filters: [
-          {
-            code: productIdCollectionFilter.code,
-            arguments: [
-              { name: "productIds", value: JSON.stringify(await productIds(...slugs)) },
-              { name: "combineWithAnd", value: "false" },
-            ],
-          },
-        ],
-        customFields: { marketplaceCategory },
-      });
-    }
-    console.log(`Tienda "${DEMO}" creada con ${result.imported} producto(s). Admin: demo@spora.localhost / demo1234`);
+    await seedStore(seed, await adminCtx(), connection);
+    console.log(`Tienda "${seed.slug}" creada. Admin: ${seed.admin.email} / ${seed.admin.password}`);
   }
 } catch (err) {
   console.error(err);
@@ -159,4 +156,70 @@ try {
   await app.close();
   // La cola de trabajos deja timers vivos después de close(): sin esto el proceso no termina.
   process.exit(process.exitCode ?? 0);
+}
+
+async function seedStore(seed: StoreSeed, ctx: RequestContext, connection: TransactionalConnection) {
+  const store = await connection.withTransaction(ctx, (tx) =>
+    app.get(StoreService).createStore(tx, {
+      name: seed.name,
+      slug: seed.slug,
+      baseCurrency: seed.currency,
+      designStyle: seed.style,
+      status: "activo",
+      administrator: {
+        firstName: seed.admin.firstName,
+        lastName: seed.admin.lastName,
+        emailAddress: seed.admin.email,
+        password: seed.admin.password,
+      },
+    }),
+  );
+
+  const csv = path.join(dir, `../seed/tiendas/${seed.slug}.csv`);
+  const result = await importProductsFromCsv(app, csv, LanguageCode.es, store);
+  // El importador no siempre reporta los errores de parseo: 0 importados también es un fallo.
+  if (result.errors?.length || !result.imported) throw new Error(`Importación fallida: ${result.errors?.join("\n")}`);
+  if (seed.currency !== "CRC") {
+    await connection.rawConnection
+      .getRepository(ProductVariantPrice)
+      .update({ channelId: store.id }, { currencyCode: CurrencyCode[seed.currency] });
+  }
+
+  // El CSV no trae campos de grupos de opciones: se mapean aquí a los atributos comunes (camiseta-sibu-talla → talla).
+  const storeCtx = await (async () => {
+    const user = await app
+      .get(UserService)
+      .getUserByEmailAddress(ctx, config.authOptions.superadminCredentials!.identifier);
+    return app.get(RequestContextService).create({ apiType: "admin", user, channelOrToken: seed.slug });
+  })();
+  const groups = app.get(ProductOptionGroupService);
+  const products = app.get(ProductService);
+  for (const slug of seed.collections.flatMap(([, , slugs]) => slugs)) {
+    const product = await products.findOneBySlug(storeCtx, slug, ["optionGroups"]);
+    for (const group of product?.optionGroups ?? []) {
+      const attribute = slugify(group.code.split("-").pop() ?? "");
+      if (isCommonAttribute(attribute)) {
+        await groups.update(storeCtx, { id: group.id, customFields: { attribute: attribute as CommonAttribute } });
+      }
+    }
+  }
+
+  // Tema, textos y categorías propias de la tienda (mapeadas a las globales).
+  await app.get(ChannelService).update(storeCtx, { id: store.id, customFields: seed.theme });
+  for (const [name, marketplaceCategory, slugs] of seed.collections) {
+    const productIds = await Promise.all(slugs.map(async (slug) => (await products.findOneBySlug(storeCtx, slug))!.id));
+    await app.get(CollectionService).create(storeCtx, {
+      translations: [{ languageCode: LanguageCode.es, name, slug: slugify(name), description: "" }],
+      filters: [
+        {
+          code: productIdCollectionFilter.code,
+          arguments: [
+            { name: "productIds", value: JSON.stringify(productIds) },
+            { name: "combineWithAnd", value: "false" },
+          ],
+        },
+      ],
+      customFields: { marketplaceCategory },
+    });
+  }
 }

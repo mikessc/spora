@@ -215,6 +215,114 @@ try {
   }
   assert.equal(new Set(shapes.values()).size, 5, `formas repetidas: ${[...shapes].join("\n")}`);
   ok("estilos: suave, minimal, vibrante, editorial y pop con el mismo HTML y botones distintos");
+
+  // ── M3: Cuenta Spora y checkout ────────────────────────────────────────────────────────────────────────────────
+  const CAFE = STORE.replace("tienda-demo", "cafe-sur");
+
+  // Precio en la tienda en USD y aproximado en colones (tipo de cambio simulado del .env: ₡515 por dólar).
+  await p1.goto(`${CAFE}/producto/cafe-tarrazu`);
+  assert.equal(await text(p1.locator(".variants__price")), "$12,50");
+  assert.equal(await text(p1.locator(".variants__other-price")), "≈ ₡6 437,50");
+  ok("moneda: tienda en USD con precio aproximado en colones al tipo de cambio del día");
+
+  // Registro en una tienda → la sesión vale en la otra.
+  const account = await browser.newContext({ viewport });
+  const pa = await account.newPage();
+  const email = `ana.${Date.now()}@correo.cr`;
+  await pa.goto(`${STORE}/cuenta/registro`);
+  await pa.fill("#nombre", "Ana");
+  await pa.fill("#apellidos", "Mora");
+  await pa.fill("#correo", email);
+  await pa.fill("#telefono", "8888-1234");
+  await pa.fill("#clave", "clave-segura");
+  await pa.click(".form__submit");
+  await pa.waitForURL(`${STORE}/cuenta`);
+  assert.equal(await text(pa.locator(".store-header__account")), "Hola, Ana");
+  await pa.goto(`${CAFE}/`);
+  assert.equal(await text(pa.locator(".store-header__account")), "Hola, Ana");
+  ok("Cuenta Spora: registro en Tienda Demo y la misma sesión en Café Sur (cookie compartida entre subdominios)");
+
+  // Compra con cuenta en Café Sur (USD): dirección del nomenclátor, envío a domicilio y contra entrega.
+  const checkout = async (page, origin, { shipping, address, contact }) => {
+    await page.goto(`${origin}/carrito`);
+    await page.click(".cart__checkout");
+    await page.waitForURL(`${origin}/checkout/datos`);
+    for (const [id, value] of Object.entries(contact ?? {})) await page.fill(`#${id}`, value);
+    if (address) {
+      if (await page.locator('input[name="direccion"][value="nueva"]').count()) {
+        await page.check('input[name="direccion"][value="nueva"]');
+      }
+      await page.fill("#destinatario", address.name);
+      await page.fill("#telefono-envio", "8888-1234");
+      await page.selectOption("#distrito", address.district);
+      await page.fill("#senas", "200 m norte de la iglesia, casa verde");
+    }
+    await page.click(".form__submit");
+    await page.waitForURL(`${origin}/checkout/envio`);
+    await page.locator(".checkout__choice", { hasText: shipping }).locator("input").check();
+    await page.click(".form__submit");
+    await page.waitForURL(`${origin}/checkout/pago`);
+    await page.locator(".checkout__choice", { hasText: "Contra entrega" }).locator("input").check();
+    await page.click(".form__submit");
+    await page.waitForURL(new RegExp(`${origin}/pedido/[A-Z0-9]+`));
+    return text(page.locator(".order__code"));
+  };
+  await pa.goto(`${CAFE}/producto/cafe-tarrazu`);
+  await pa.locator(".add-to-cart__button").click();
+  await pa.locator(".add-to-cart__status", { hasText: "Agregado" }).waitFor();
+  const cafeOrder = await checkout(pa, CAFE, {
+    shipping: "Envío a domicilio",
+    address: { name: "Ana Mora", district: "10201" },
+  });
+  assert.match(await text(pa.locator(".checkout")), /¡Gracias por su compra!/);
+  assert.match(await text(pa.locator(".checkout")), /Escazú, Escazú, San José \(10201\)/);
+  assert.match(await text(pa.locator(".summary__total")), /\$17,50/); // $12,50 + $5 de envío
+  assert.match(await text(pa.locator(".order__rate")), /₡515\.00 por dólar/);
+  ok(
+    `checkout con cuenta en Café Sur: pedido ${cafeOrder}, $17,50, dirección del nomenclátor y tipo de cambio guardado`,
+  );
+
+  // Compra sin JS y sin cuenta en Tienda Demo: retiro en local.
+  const guest = await browser.newContext({ javaScriptEnabled: false, viewport });
+  const pg = await guest.newPage();
+  await pg.goto(`${STORE}/producto/camiseta-volcan`);
+  await pg.locator(".add-to-cart__button").click();
+  await pg.waitForURL(`${STORE}/carrito`);
+  const guestOrder = await checkout(pg, STORE, {
+    shipping: "Retiro en local",
+    address: { name: "Luis Rojas", district: "30101" },
+    contact: { nombre: "Luis", apellidos: "Rojas", correo: `luis.${Date.now()}@correo.cr`, telefono: "8777-0000" },
+  }).catch(async (err) => {
+    throw new Error(`${err.message}\n${await text(pg.locator("main"))}`);
+  });
+  assert.match(await text(pg.locator(".summary__total")), /₡14 000/);
+  assert.match(await text(pg.locator(".summary__other")), /≈ \$27,18/);
+  await guest.close();
+  ok(`checkout sin JS y sin cuenta en Tienda Demo: pedido ${guestOrder}, retiro en local, total ≈ en dólares`);
+
+  // De vuelta con cuenta: la dirección guardada sale elegida; la cuenta muestra los pedidos de ambas tiendas.
+  await pa.goto(`${STORE}/producto/gorra-sibu`);
+  await pa.locator(".add-to-cart__button").click();
+  await pa.locator(".add-to-cart__status", { hasText: "Agregado" }).waitFor();
+  await pa.goto(`${STORE}/checkout/datos`);
+  assert.ok(await pa.locator('input[name="direccion"]').first().isChecked());
+  const demoOrder = await checkout(pa, STORE, { shipping: "Envío a domicilio" });
+  await pa.goto(`${CAFE}/cuenta`);
+  const rows = await pa.locator(".account__orders tbody tr").allTextContents();
+  assert.equal(rows.length, 2);
+  assert.ok(rows[0]?.includes(demoOrder) && rows[0].includes("Tienda Demo"), rows[0]);
+  assert.ok(rows[1]?.includes(cafeOrder) && rows[1].includes("Café Sur"), rows[1]);
+  assert.equal(
+    await pa.locator(`.account__orders a:text("${demoOrder}")`).getAttribute("href"),
+    `${STORE}/pedido/${demoOrder}`,
+  );
+  await pa.click(".form__secondary");
+  await pa.goto(`${STORE}/`);
+  assert.equal(await text(pa.locator(".store-header__account")), "Ingresar");
+  await account.close();
+  ok(
+    "cuenta: dirección guardada, pedidos de Tienda Demo y Café Sur en un solo historial, y salir cierra la sesión en ambas",
+  );
 } finally {
   await browser.close();
   console.log(results.join("\n"));

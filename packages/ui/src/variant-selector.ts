@@ -1,12 +1,29 @@
-import type { OptionGroup, StockLevel, Variant } from "@spora/shared";
+import {
+  convertMoney,
+  formatMoney,
+  type Money,
+  type OptionGroup,
+  otherCurrency,
+  type StockLevel,
+  type Variant,
+} from "@spora/shared";
 import { derived, div, fieldset, input, isSSR, label, legend, p, signal, span } from "sibujs";
-import { formatMoney } from "@spora/shared";
+import { markIf } from "./ssr-form";
 import { emitVariant } from "./variant-event";
 
 export interface VariantSelectorProps {
   optionGroups: OptionGroup[];
   variants: Variant[];
   initialVariantId: string;
+  /** Colones por dólar del día, para mostrar el precio aproximado en la otra moneda (`null`: no se muestra). */
+  exchangeRate?: string | null;
+}
+
+/** Precio en la otra moneda: el manual del comercio si lo puso, si no la conversión con el tipo de cambio. */
+export function otherPrice(variant: Variant, rate: string | null | undefined): Money | null {
+  const currency = otherCurrency(variant.price.currency);
+  if (variant.otherCurrencyPrice != null) return { amount: variant.otherCurrencyPrice, currency };
+  return rate ? convertMoney(variant.price, currency, rate) : null;
 }
 
 const STOCK_TEXT: Record<StockLevel, string> = {
@@ -15,7 +32,7 @@ const STOCK_TEXT: Record<StockLevel, string> = {
   OUT_OF_STOCK: "Agotado",
 };
 
-export function VariantSelector({ optionGroups, variants, initialVariantId }: VariantSelectorProps) {
+export function VariantSelector({ optionGroups, variants, initialVariantId, exchangeRate }: VariantSelectorProps) {
   const groupOf = new Map(optionGroups.flatMap((g) => g.options.map((o) => [o.id, g.id] as const)));
   const initial = variants.find((v) => v.id === initialVariantId) ?? variants[0];
   const [selected, setSelected] = signal<Record<string, string>>(
@@ -46,6 +63,11 @@ export function VariantSelector({ optionGroups, variants, initialVariantId }: Va
       const v = variant();
       return v ? formatMoney(v.price) : "No disponible";
     }),
+    p("variants__other-price", () => {
+      const v = variant();
+      const other = v && otherPrice(v, exchangeRate);
+      return other ? `≈ ${formatMoney(other)}` : "";
+    }),
     p({ class: "variants__stock", "data-stock": stock }, () => STOCK_TEXT[stock()]),
     ...optionGroups.map((group) =>
       fieldset("variants__group", [
@@ -65,11 +87,8 @@ export function VariantSelector({ optionGroups, variants, initialVariantId }: Va
                   name: `opcion-${group.id}`,
                   value: option.id,
                   checked: () => selected()[group.id] === option.id,
-                  // `checked` es estado (propiedad IDL) y el SSR no lo serializa: el HTML llegaría sin
-                  // talla/color marcados y el chip cambiaría al hidratar. En el servidor va también como atributo.
-                  onElement: (el) => {
-                    if (isSSR() && selected()[group.id] === option.id) el.setAttribute("checked", "");
-                  },
+                  // El SSR no serializa `checked` (ver ssr-form.ts): en el servidor va también como atributo.
+                  onElement: markIf(isSSR() && selected()[group.id] === option.id, "checked"),
                   on: { change: () => choose(group.id, option.id) },
                 }),
                 span("variants__label", option.name),

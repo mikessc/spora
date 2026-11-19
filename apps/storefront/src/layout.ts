@@ -1,5 +1,5 @@
 // Armazón de todas las páginas de una tienda. Solo servidor.
-import type { Store, StoreCollection } from "@spora/api-client";
+import type { Customer, Store, StoreCollection } from "@spora/api-client";
 import { a, button, div, footer, form, header, img, input, label, li, nav, p, span, ul } from "sibujs";
 
 export const policyPages = {
@@ -13,11 +13,13 @@ export interface ShellData {
   store: Store;
   collections: StoreCollection[];
   cartCount: number;
+  /** Cliente con sesión (Cuenta Spora) o `null`. */
+  customer: Customer | null;
   /** Búsqueda vigente (se muestra en el buscador). */
   query?: string;
 }
 
-export function Shell({ store, collections, cartCount, query }: ShellData, content: Node) {
+export function Shell({ store, collections, cartCount, customer, query }: ShellData, content: Node) {
   const policies = (Object.keys(policyPages) as PolicyPage[]).filter((key) => store.policies[key]);
   return div("store", [
     header("store-header", [
@@ -30,6 +32,9 @@ export function Shell({ store, collections, cartCount, query }: ShellData, conte
         input({ id: "buscar", class: "store-search__input", type: "search", name: "q", value: query ?? "" }),
         button({ class: "store-search__button", type: "submit" }, "Buscar"),
       ]),
+      customer
+        ? a({ class: "store-header__account", href: "/cuenta" }, `Hola, ${customer.firstName}`)
+        : a({ class: "store-header__account", href: "/cuenta/ingresar" }, "Ingresar"),
       // Isla `cart-count`: el contador se actualiza cuando una isla agrega al carrito.
       a({ class: "store-header__cart", href: "/carrito", "data-sibu-island": "cart-count" }, [
         "Carrito ",

@@ -12,9 +12,40 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
 - **Sombras fijas de sibujs-ui:** sus componentes traen sombras de Tailwind con valores fijos (no son variables), así
   que los estilos de `@spora/themes` no las controlan. Hoy se tapan con clases propias; al compilar Tailwind, mapear
   `--shadow-*` a las variables `--sp-shadow*`.
-- **Bug de SSR de SibuJS** (`checked`, `selected` y `value` reactivo no salen en el HTML del servidor): con un
+- **Bug de SSR de SibuJS** (`checked`, `selected` y `value` reactivo no salen en el HTML del servidor; confirmado con un
+  test canario en M3): con un
   workaround en los componentes. Reporte para upstream en
   [reportes/sibujs-checked-ssr.md](reportes/sibujs-checked-ssr.md).
+
+## 2026-11-19 — M3: Cuenta Spora y checkout ✔
+- Hecho:
+  - **Cuenta Spora única**: registro, ingreso y salida desde cualquier tienda; la sesión se comparte entre
+    `*.spora.localhost` (la misma cuenta sirve en todas). El cliente se asigna solo a cada tienda donde opera.
+    "Mi cuenta" muestra los pedidos de **todas las tiendas** (con enlace a cada una) y las direcciones guardadas.
+  - **Direcciones con el nomenclátor de Costa Rica**, copiado de TrackingApp con sus mismos códigos (provincia ›
+    cantón › distrito = código postal).
+  - **Checkout** en pasos: datos y dirección → envío → pago → confirmación. Con cuenta (direcciones guardadas) o como
+    invitado. Todo con formularios: funciona sin JS. Cada tienda nueva nace con envío a domicilio, retiro en local y
+    contra entrega.
+  - **Monedas**: tipo de cambio de venta del BCCR por día de negocio (adaptador real con credenciales en `.env` y
+    simulado con tasa fija por defecto). Precio aproximado en la otra moneda en ficha y resumen. Precio manual opcional
+    en la otra moneda (campo de la variante). **El pedido guarda moneda, monto y tipo de cambio** al pasar a pago.
+  - Segunda tienda de ejemplo, **Café Sur, en USD**. El seed ahora es por datos (lista de tiendas con su CSV).
+  - Precios como en Costa Rica: "$12,50" (no "USD 12,50").
+- **Bug de SSR de SibuJS con `value` y `selected`**: confirmado con un test canario (`packages/ui/src/ssr-form.test.ts`).
+  `selected` (fijo o reactivo), `checked` y `value` reactivo no salen en el HTML del servidor. Los formularios usan
+  `markIf()`, probado en el mismo test. Si el canario falla, upstream lo arregló y se puede quitar el workaround.
+- Tests: tipo de cambio (enteros, fecha de negocio en CR, parser del BCCR), nomenclátor, cookie compartida y
+  redirecciones seguras; en Vendure: métodos por defecto de una tienda nueva, cuenta reconocida en otra tienda, tasa
+  guardada al pasar a pago e historial de todas las tiendas. `pnpm e2e` (15 recorridos) suma: precio en USD con ≈ en
+  colones, registro y sesión compartida, compra con cuenta en Café Sur (USD), compra sin JS y sin cuenta en Tienda
+  Demo, compra con dirección guardada, historial con las dos tiendas y salida.
+- Cómo probarlo: [LOCAL.md](LOCAL.md).
+- Pendiente:
+  - Un visitante sin cuenta que agrega en una segunda tienda pierde el carrito de la primera (un carrito activo por
+    sesión en Vendure). Con cuenta no pasa. Ver [DECISIONES-MVP.md](DECISIONES-MVP.md).
+  - Las cuentas solo se gestionan desde las tiendas; el marketplace (M6) usará las mismas páginas.
+- Sigue: **M4**, pagos.
 
 ## 2026-11-19 — M2: storefront multi-tenant y estilos ✔
 - Hecho:

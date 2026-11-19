@@ -12,6 +12,8 @@ export function formatMoney({ amount, currency }: Money): string {
   return new Intl.NumberFormat("es-CR", {
     style: "currency",
     currency,
+    // "$25,50" y no "USD 25,50", como se escribe en Costa Rica.
+    currencyDisplay: "narrowSymbol",
     minimumFractionDigits: amount % 100 === 0 ? 0 : 2,
   }).format(amount / 100);
 }

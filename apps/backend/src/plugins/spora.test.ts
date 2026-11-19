@@ -2,18 +2,27 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LanguageCode, mergeConfig } from "@vendure/core";
+import { businessDate } from "@spora/shared";
 import { createTestEnvironment, registerInitializer, SqljsInitializer, testConfig } from "@vendure/testing";
 import gql from "graphql-tag";
 import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
+import { AccountPlugin } from "./account/account.plugin";
 import { CatalogPlugin } from "./catalog/catalog.plugin";
+import { CurrencyPlugin } from "./currency/currency.plugin";
+import { cashOnDeliveryHandler } from "./payments/cash-on-delivery";
 import { SellersPlugin } from "./sellers/sellers.plugin";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 registerInitializer("sqljs", new SqljsInitializer(path.join(dir, "../../__data__")));
 
-const config = mergeConfig(testConfig, { plugins: [SellersPlugin, CatalogPlugin] });
-const { server, adminClient } = createTestEnvironment(config);
+process.env.BCCR_SIMULATED_RATE = "515.25";
+const config = mergeConfig(testConfig, {
+  plugins: [SellersPlugin, CatalogPlugin, CurrencyPlugin, AccountPlugin],
+  paymentOptions: { paymentMethodHandlers: [cashOnDeliveryHandler] },
+  authOptions: { requireVerification: false },
+});
+const { server, adminClient, shopClient } = createTestEnvironment(config);
 const shopUrl = `http://localhost:${config.apiOptions.port}/${config.apiOptions.shopApiPath}`;
 
 const REGISTER = gql`
@@ -323,5 +332,210 @@ describe("catálogo", () => {
       adminClient.query(CREATE_PRODUCT, { enabled: false, slug: "otro", category: "moda", brand: "britt" }),
       /fusionó/,
     );
+  });
+});
+
+describe("cuenta y checkout (M3)", () => {
+  const DEFAULT_TOKEN = testConfig.defaultChannelToken ?? "e2e-default-channel";
+  const ORDER = `code state currencyCode totalWithTax customFields { exchangeRate exchangeRateDate }`;
+  const RESULT = `__typename ... on Order { ${ORDER} } ... on ErrorResult { errorCode message }`;
+  const customer = { emailAddress: "rosa@correo.cr", firstName: "Rosa", lastName: "Vargas", password: "clave-segura" };
+
+  before(async () => {
+    // Café Sur (USD) quedó suspendida en las pruebas de alta: se activa y se le crea un producto con stock.
+    await adminClient.asSuperAdmin();
+    const { channels } = await adminClient.query(gql`
+      query {
+        channels {
+          items {
+            code
+            seller {
+              id
+            }
+          }
+        }
+      }
+    `);
+    const cafe = channels.items.find((c: { code: string }) => c.code === "cafe-sur");
+    await adminClient.query(
+      gql`
+        mutation ($id: ID!) {
+          updateSeller(input: { id: $id, customFields: { status: "activo" } }) {
+            id
+          }
+        }
+      `,
+      { id: cafe.seller.id },
+    );
+    adminClient.setChannelToken("cafe-sur");
+    const { createProduct } = await adminClient.query(CREATE_PRODUCT, {
+      enabled: true,
+      slug: "cafe-500",
+      category: "moda",
+    });
+    await adminClient.query(
+      gql`
+        mutation ($productId: ID!) {
+          createProductVariants(
+            input: [
+              {
+                productId: $productId
+                sku: "CAF-500"
+                price: 1000
+                stockOnHand: 20
+                translations: [{ languageCode: es, name: "Café 500 g" }]
+              }
+            ]
+          ) {
+            id
+          }
+        }
+      `,
+      { productId: createProduct.id },
+    );
+    adminClient.setChannelToken(DEFAULT_TOKEN);
+  });
+
+  test("una tienda nueva vende desde el primer día: envío propio, retiro y contra entrega", async () => {
+    shopClient.setChannelToken("cafe-sur");
+    const { product } = await shopClient.query(gql`
+      query {
+        product(slug: "cafe-500") {
+          variants {
+            id
+          }
+        }
+      }
+    `);
+    await shopClient.query(
+      gql`mutation ($id: ID!) { addItemToOrder(productVariantId: $id, quantity: 2) { ${RESULT} } }`,
+      { id: product.variants[0].id },
+    );
+    const { eligibleShippingMethods, eligiblePaymentMethods } = await shopClient.query(gql`
+      query {
+        eligibleShippingMethods {
+          name
+          priceWithTax
+        }
+        eligiblePaymentMethods {
+          code
+          isEligible
+        }
+      }
+    `);
+    const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
+    assert.deepEqual(eligibleShippingMethods.sort(byName), [
+      { name: "Envío a domicilio", priceWithTax: 500 },
+      { name: "Retiro en local", priceWithTax: 0 },
+    ]);
+    assert.deepEqual(eligiblePaymentMethods, [{ code: "cafe-sur-contra-entrega", isEligible: true }]);
+  });
+
+  test("una sola cuenta: se registra en el marketplace y Café Sur la reconoce sin registrarse de nuevo", async () => {
+    shopClient.setChannelToken(DEFAULT_TOKEN);
+    await shopClient.query(
+      gql`
+        mutation ($input: RegisterCustomerInput!) {
+          registerCustomerAccount(input: $input) {
+            __typename
+          }
+        }
+      `,
+      { input: customer },
+    );
+    shopClient.setChannelToken("cafe-sur");
+    await shopClient.asUserWithCredentials(customer.emailAddress, customer.password);
+    const { activeCustomer } = await shopClient.query(gql`
+      query {
+        activeCustomer {
+          emailAddress
+        }
+      }
+    `);
+    assert.equal(activeCustomer?.emailAddress, customer.emailAddress);
+  });
+
+  test("el pedido guarda moneda, monto y el tipo de cambio del día al pasar a pago", async () => {
+    shopClient.setChannelToken("cafe-sur");
+    const { product } = await shopClient.query(gql`
+      query {
+        product(slug: "cafe-500") {
+          variants {
+            id
+          }
+        }
+      }
+    `);
+    await shopClient.query(
+      gql`mutation ($id: ID!) { addItemToOrder(productVariantId: $id, quantity: 1) { ${RESULT} } }`,
+      { id: product.variants[0].id },
+    );
+    await shopClient.query(
+      gql`mutation ($input: CreateAddressInput!) { setOrderShippingAddress(input: $input) { ${RESULT} } }`,
+      {
+        input: {
+          fullName: "Rosa Vargas",
+          streetLine1: "Frente a la plaza",
+          city: "Escazú",
+          province: "San José",
+          postalCode: "10201",
+          countryCode: "CR",
+          customFields: { district: "Escazú", districtCode: "10201" },
+        },
+      },
+    );
+    const { eligibleShippingMethods } = await shopClient.query(gql`
+      query {
+        eligibleShippingMethods {
+          id
+          name
+        }
+      }
+    `);
+    const delivery = eligibleShippingMethods.find((m: { name: string }) => m.name === "Envío a domicilio");
+    await shopClient.query(
+      gql`mutation ($id: [ID!]!) { setOrderShippingMethod(shippingMethodId: $id) { ${RESULT} } }`,
+      {
+        id: [delivery.id],
+      },
+    );
+    const { transitionOrderToState: order } = await shopClient.query(
+      gql`mutation { transitionOrderToState(state: "ArrangingPayment") { ${RESULT} } }`,
+    );
+    assert.equal(order.currencyCode, "USD");
+    assert.equal(order.customFields.exchangeRate, "515.25");
+    assert.equal(order.customFields.exchangeRateDate, businessDate());
+    const { addPaymentToOrder: paid } = await shopClient.query(
+      gql`mutation { addPaymentToOrder(input: { method: "cafe-sur-contra-entrega", metadata: {} }) { ${RESULT} } }`,
+    );
+    assert.equal(paid.state, "PaymentAuthorized");
+    // 1 × $10 + $5 de envío (el cliente de pruebas abre una sesión nueva al ingresar: no trae el carrito anónimo).
+    assert.equal(paid.totalWithTax, 1500);
+  });
+
+  test("el historial de la Cuenta Spora junta los pedidos de todas las tiendas", async () => {
+    shopClient.setChannelToken(DEFAULT_TOKEN);
+    const { sporaOrders } = await shopClient.query(gql`
+      query {
+        sporaOrders {
+          storeToken
+          storeName
+          currencyCode
+          total
+          exchangeRate
+          state
+        }
+      }
+    `);
+    assert.deepEqual(sporaOrders, [
+      {
+        storeToken: "cafe-sur",
+        storeName: "Café Sur",
+        currencyCode: "USD",
+        total: 1500,
+        exchangeRate: "515.25",
+        state: "PaymentAuthorized",
+      },
+    ]);
   });
 });

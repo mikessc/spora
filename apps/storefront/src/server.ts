@@ -2,12 +2,16 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createShopClient, ShopApiError, type ShopClient, type Store } from "@spora/api-client";
 import { parseCatalogQuery } from "@spora/shared";
-import { type Context, Hono } from "hono";
+import { Hono } from "hono";
 import { renderToStringAsync } from "sibujs/ssr";
-import { documentHtml, type PageMeta, sitemapXml, styleFor } from "./document";
+import { registerAccountRoutes } from "./account";
+import { registerCheckoutRoutes } from "./checkout";
+import type { Ctx, Env, Page } from "./context";
+import { documentHtml, sitemapXml, styleFor } from "./document";
 import { type PolicyPage, policyPages, Shell } from "./layout";
-import { CartPage, Listing, NotFoundPage, PolicyPageView, StoreIntro } from "./pages";
+import { CartPage, Listing, notFound, PolicyPageView, StoreIntro } from "./pages";
 import { ProductPage, productJsonLd } from "./product-page";
+import { shareSessionCookie } from "./session-cookie";
 import { storeSlugFromHost } from "./store-host";
 
 const SHOP_API = process.env.VENDURE_SHOP_API ?? "http://localhost:3000/shop-api";
@@ -15,7 +19,6 @@ const SHOP_API = process.env.VENDURE_SHOP_API ?? "http://localhost:3000/shop-api
 const BASE_DOMAIN = process.env.STORE_BASE_DOMAIN ?? "spora.localhost";
 const PORT = Number(process.env.PORT ?? 4000);
 
-type Env = { Variables: { slug: string; shop: ShopClient; setCookies: string[] } };
 const app = new Hono<Env>();
 
 // Rutas relativas a apps/storefront (los scripts de pnpm corren ahí).
@@ -49,8 +52,8 @@ app.use("*", async (c, next) => {
     }),
   );
   await next();
-  // La sesión (y su carrito) la crea Vendure: sus cookies pasan al navegador tal cual.
-  for (const cookie of setCookies) c.header("set-cookie", cookie, { append: true });
+  // La sesión (carrito y Cuenta Spora) la crea Vendure: sus cookies pasan al navegador, compartidas entre tiendas.
+  for (const cookie of setCookies) c.header("set-cookie", shareSessionCookie(cookie, BASE_DOMAIN), { append: true });
 });
 
 // Proxy a la Shop API para las islas: el navegador nunca habla directo con Vendure ni elige el canal.
@@ -67,6 +70,9 @@ app.post("/shop-api", async (c) => {
   const headers = new Headers(res.headers);
   headers.delete("content-encoding");
   headers.delete("content-length");
+  headers.delete("set-cookie");
+  for (const cookie of res.headers.getSetCookie())
+    headers.append("set-cookie", shareSessionCookie(cookie, BASE_DOMAIN));
   return new Response(res.body, { status: res.status, headers });
 });
 
@@ -82,21 +88,27 @@ async function loadStore(shop: ShopClient): Promise<Store | null> {
   }
 }
 
-/** Una página carga sus datos y devuelve cómo construirse: el árbol se arma dentro del render SSR (con su DOM). */
-type Page = (store: Store) => Promise<{ content: () => Node; meta: Omit<PageMeta, "canonical">; status?: number }>;
-
 /** Arma una página de la tienda: datos del armazón en paralelo, SSR y documento con estilo y SEO. */
-async function render(c: Context<Env>, page: Page) {
+async function render(c: Ctx, page: Page) {
   const shop = c.get("shop");
   const store = await loadStore(shop);
   if (!store) {
     return c.html(plainPage("Tienda no disponible", "Esta tienda no existe o todavía no está publicada."), 404);
   }
-  const [collections, cart, result] = await Promise.all([shop.collections(), shop.activeOrder(), page(store)]);
+  // La página va primero: puede cambiar el carrito o la sesión (formularios), y el armazón debe mostrarlo ya.
+  const result = await page(store);
+  if (result instanceof Response) return result;
+  const [collections, cart, customer] = await Promise.all([shop.collections(), shop.activeOrder(), shop.customer()]);
   const url = new URL(c.req.url);
   const { html } = await renderToStringAsync(() =>
     Shell(
-      { store, collections, cartCount: cart?.totalQuantity ?? 0, query: url.searchParams.get("q") ?? "" },
+      {
+        store,
+        collections,
+        customer,
+        cartCount: cart?.totalQuantity ?? 0,
+        query: url.searchParams.get("q") ?? "",
+      },
       result.content(),
     ),
   );
@@ -106,12 +118,6 @@ async function render(c: Context<Env>, page: Page) {
     (result.status ?? 200) as 200,
   );
 }
-
-const notFound = (text: string) => ({
-  content: () => NotFoundPage("No encontrado", text),
-  meta: { title: "No encontrado", noindex: true },
-  status: 404,
-});
 
 app.get("/", (c) =>
   render(c, async (store) => {
@@ -170,11 +176,15 @@ app.get("/buscar", (c) =>
 app.get("/producto/:slug", (c) =>
   render(c, async (store) => {
     const shop = c.get("shop");
-    const [product, brands] = await Promise.all([shop.product(c.req.param("slug")), shop.brandNames()]);
+    const [product, brands, rate] = await Promise.all([
+      shop.product(c.req.param("slug")),
+      shop.brandNames(),
+      shop.exchangeRate(),
+    ]);
     if (!product) return notFound("Puede que este producto ya no esté a la venta.");
     const url = new URL(c.req.url);
     return {
-      content: () => ProductPage(product),
+      content: () => ProductPage(product, rate.rate),
       meta: {
         title: `${product.name} · ${store.name}`,
         description: product.descriptionHtml
@@ -261,6 +271,9 @@ app.get("/sitemap.xml", async (c) => {
   ];
   return c.body(sitemapXml(urls), 200, { "content-type": "application/xml; charset=utf-8" });
 });
+
+registerAccountRoutes(app, render, BASE_DOMAIN);
+registerCheckoutRoutes(app, render);
 
 serve({ fetch: app.fetch, port: PORT }, ({ port }) =>
   console.log(`Storefront en http://<tienda>.${BASE_DOMAIN}:${port}`),

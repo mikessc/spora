@@ -1,0 +1,4 @@
+name,slug,description,assets,facets,optionGroups,optionValues,sku,price,taxCategory,stockOnHand,trackInventory,variantAssets,variantFacets,product:marketplaceCategory,product:brand
+Café de Tarrazú,cafe-tarrazu,"<p>Café de altura de Tarrazú, tueste medio. Notas de chocolate y cítricos.</p>",cafe-tarrazu-340.svg|cafe-tarrazu-1kg.svg,,Tamaño,340 g,CAF-TAR-340,12.50,IVA,30,true,cafe-tarrazu-340.svg,,cafe-y-alimentos-cafe,cafe-sur
+,,,,,,1 kg,CAF-TAR-1K,32.00,IVA,12,true,cafe-tarrazu-1kg.svg,,,
+Chocolate 70 %,chocolate-70,"<p>Tableta de chocolate oscuro con cacao de Talamanca.</p>",chocolate-70.svg,,,,CHO-70,6.00,IVA,40,true,,,cafe-y-alimentos-chocolate,cafe-sur

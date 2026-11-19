@@ -378,3 +378,187 @@ a {
   max-width: 42rem;
   line-height: 1.7;
 }
+
+/* Precio aproximado en la otra moneda */
+.variants__other-price {
+  margin: -0.75rem 0 0;
+  min-height: 1.2em;
+  font-size: var(--sp-text-sm);
+  color: var(--sp-color-muted);
+}
+
+/* Cuenta y checkout */
+.store-header__account {
+  text-decoration: none;
+}
+.account,
+.checkout {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: calc(var(--sp-space) * 2) var(--sp-space);
+}
+.account__title,
+.checkout__title {
+  margin: 0 0 var(--sp-space);
+  font-family: var(--sp-heading-font);
+  font-size: var(--sp-text-xl);
+  font-weight: var(--sp-heading-weight);
+  text-transform: var(--sp-heading-transform);
+  letter-spacing: var(--sp-heading-tracking);
+}
+.account__intro,
+.checkout__who {
+  color: var(--sp-color-muted);
+}
+.account__section,
+.checkout__block {
+  margin: calc(var(--sp-space) * 1.5) 0;
+}
+.account__orders {
+  width: 100%;
+  border-collapse: collapse;
+}
+.account__orders th,
+.account__orders td {
+  padding: 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--sp-color-border);
+}
+.checkout__steps {
+  display: flex;
+  gap: var(--sp-space);
+  margin: 0 0 var(--sp-space);
+  padding: 0;
+  list-style: none;
+  font-size: var(--sp-text-sm);
+  color: var(--sp-color-muted);
+}
+.checkout__step[aria-current="step"] {
+  color: var(--sp-color-fg);
+  font-weight: 700;
+}
+
+/* Formularios */
+.form {
+  display: grid;
+  gap: var(--sp-space);
+  margin-bottom: calc(var(--sp-space) * 1.5);
+}
+.form__group {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: var(--sp-surface-padding);
+  background: var(--sp-color-surface);
+  border: var(--sp-border-width) solid var(--sp-border-color);
+  border-radius: var(--sp-radius);
+}
+.form__group legend {
+  padding: 0 0.25rem;
+  font-weight: 600;
+}
+.form__field,
+.address__field {
+  display: grid;
+  gap: 0.3rem;
+}
+.address {
+  display: grid;
+  gap: 0.75rem;
+}
+.form input:not([type="radio"], [type="checkbox"], [type="hidden"]),
+.form select,
+.form textarea {
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  color: inherit;
+  background: var(--sp-color-bg);
+  border: max(var(--sp-border-width), 1px) solid var(--sp-border-color);
+  border-radius: var(--sp-radius-sm);
+}
+.address__hint {
+  margin: 0;
+  font-size: var(--sp-text-sm);
+  color: var(--sp-color-muted);
+}
+.form__submit,
+.cart__checkout {
+  justify-self: start;
+  padding: 0.7rem 1.4rem;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  color: var(--sp-button-fg);
+  background: var(--sp-button-bg);
+  border: var(--sp-border-width) solid var(--sp-border-color);
+  border-radius: var(--sp-radius-pill);
+  box-shadow: var(--sp-shadow-sm);
+}
+.cart__checkout {
+  justify-self: end;
+}
+.form__secondary {
+  padding: 0.5rem 1rem;
+  font: inherit;
+  cursor: pointer;
+  background: var(--sp-color-bg);
+  border: 1px solid var(--sp-color-border);
+  border-radius: var(--sp-radius-pill);
+}
+.form__error {
+  padding: 0.75rem;
+  color: var(--sp-color-danger);
+  border: 1px solid currentColor;
+  border-radius: var(--sp-radius-sm);
+}
+.checkout__choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.6rem;
+  align-items: baseline;
+  cursor: pointer;
+}
+.checkout__choice input {
+  accent-color: var(--sp-color-primary);
+}
+.checkout__choice-price {
+  margin-left: auto;
+  font-weight: 600;
+}
+.checkout__choice-note {
+  flex-basis: 100%;
+  padding-left: 1.6rem;
+  font-size: var(--sp-text-sm);
+  color: var(--sp-color-muted);
+}
+
+/* Resumen del pedido */
+.summary {
+  display: grid;
+  gap: 0.4rem;
+  padding: var(--sp-surface-padding);
+  background: var(--sp-color-surface);
+  border: var(--sp-border-width) solid var(--sp-border-color);
+  border-radius: var(--sp-radius);
+}
+.summary__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-space);
+}
+.summary__total {
+  padding-top: 0.4rem;
+  font-size: var(--sp-text-lg);
+  font-weight: 700;
+  border-top: 1px solid var(--sp-color-border);
+}
+.summary__other {
+  margin: 0;
+  font-size: var(--sp-text-sm);
+  color: var(--sp-color-muted);
+}
+.order__code {
+  font-weight: 700;
+  color: var(--sp-color-fg);
+}

@@ -7,12 +7,30 @@ import {
   type CurrencyCode,
   htmlToParagraphs,
   isCommonAttribute,
-  type Money,
   type Product,
   slugify,
   type StockLevel,
   type StoreCollection,
+  type Address,
+  type Customer,
+  type ExchangeRate,
+  type OrderSummary,
+  type PaymentOption,
+  type ShippingOption,
 } from "@spora/shared";
+import {
+  CUSTOMER_QUERY,
+  ORDER,
+  ORDER_RESULT,
+  type RawCustomer,
+  type RawOrder,
+  type RawOrderResult,
+  SPORA_ORDERS_QUERY,
+  toAddressInput,
+  toCart,
+  toCustomer,
+  toOrderSummary,
+} from "./order";
 
 export type * from "@spora/shared";
 
@@ -114,6 +132,9 @@ const PRODUCT_QUERY = /* GraphQL */ `
         options {
           id
         }
+        customFields {
+          otherCurrencyPrice
+        }
       }
     }
   }
@@ -170,40 +191,7 @@ const COLLECTIONS_QUERY = /* GraphQL */ `
   }
 `;
 
-const ORDER = /* GraphQL */ `
-  code
-  totalQuantity
-  subTotalWithTax
-  totalWithTax
-  currencyCode
-  lines {
-    id
-    quantity
-    unitPriceWithTax
-    linePriceWithTax
-    featuredAsset {
-      preview
-    }
-    productVariant {
-      name
-      product {
-        name
-        slug
-      }
-    }
-  }
-`;
-
 const ACTIVE_ORDER_QUERY = `query ActiveOrder { activeOrder { ${ORDER} } }`;
-
-const ORDER_RESULT = `
-  __typename
-  ... on Order { ${ORDER} }
-  ... on ErrorResult {
-    errorCode
-    message
-  }
-`;
 
 const ADD_ITEM_MUTATION = `mutation AddItem($variantId: ID!, $quantity: Int!) {
   addItemToOrder(productVariantId: $variantId, quantity: $quantity) { ${ORDER_RESULT} }
@@ -224,6 +212,7 @@ interface RawVariant {
   stockLevel: StockLevel;
   featuredAsset: { id: string } | null;
   options: { id: string }[];
+  customFields: { otherCurrencyPrice: number | null };
 }
 interface RawProduct extends Omit<Product, "descriptionHtml" | "variants" | "brand"> {
   description: string;
@@ -241,43 +230,6 @@ interface RawCatalogProduct {
   optionGroups: { customFields: { attribute: string | null }; options: { id: string; name: string }[] }[];
   variants: { priceWithTax: number; currencyCode: CurrencyCode; stockLevel: StockLevel }[];
 }
-interface RawOrder {
-  code: string;
-  totalQuantity: number;
-  subTotalWithTax: number;
-  totalWithTax: number;
-  currencyCode: CurrencyCode;
-  lines: {
-    id: string;
-    quantity: number;
-    unitPriceWithTax: number;
-    linePriceWithTax: number;
-    featuredAsset: { preview: string } | null;
-    productVariant: { name: string; product: { name: string; slug: string } };
-  }[];
-}
-type RawOrderResult = ({ __typename: "Order" } & RawOrder) | { __typename: string; errorCode: string; message: string };
-
-const toCart = (o: RawOrder): Cart => {
-  const money = (amount: number): Money => ({ amount, currency: o.currencyCode });
-  return {
-    code: o.code,
-    totalQuantity: o.totalQuantity,
-    subTotal: money(o.subTotalWithTax),
-    total: money(o.totalWithTax),
-    lines: o.lines.map((l) => ({
-      id: l.id,
-      quantity: l.quantity,
-      productName: l.productVariant.product.name,
-      productSlug: l.productVariant.product.slug,
-      variantName: l.productVariant.name,
-      image: l.featuredAsset?.preview ?? null,
-      unitPrice: money(l.unitPriceWithTax),
-      linePrice: money(l.linePriceWithTax),
-    })),
-  };
-};
-
 const toCatalogProduct = (p: RawCatalogProduct): CatalogProduct => {
   const attributes: Partial<Record<CommonAttribute, AttributeValue[]>> = {};
   for (const group of p.optionGroups) {
@@ -377,6 +329,7 @@ export function createShopClient({ url, channelToken, cookie, onSetCookie }: Sho
           stockLevel: v.stockLevel,
           featuredAssetId: v.featuredAsset?.id ?? null,
           optionIds: v.options.map((o) => o.id),
+          otherCurrencyPrice: v.customFields.otherCurrencyPrice,
         })),
       };
     },
@@ -440,6 +393,180 @@ export function createShopClient({ url, channelToken, cookie, onSetCookie }: Sho
         lineId,
       });
       return orderResult(removeOrderLine);
+    },
+
+    // ── Cuenta Spora ──────────────────────────────────────────────────────────────────────────────────────────
+    async customer(): Promise<Customer | null> {
+      const { activeCustomer } = await request<{ activeCustomer: RawCustomer | null }>(CUSTOMER_QUERY);
+      return activeCustomer ? toCustomer(activeCustomer) : null;
+    },
+
+    /** Inicia sesión; lanza `ShopApiError` con el código de Vendure (INVALID_CREDENTIALS_ERROR…) si falla. */
+    async login(email: string, password: string): Promise<void> {
+      const { login } = await request<{ login: { __typename: string; errorCode?: string; message?: string } }>(
+        `mutation Login($email: String!, $password: String!) {
+          login(username: $email, password: $password, rememberMe: true) {
+            __typename
+            ... on ErrorResult { errorCode message }
+          }
+        }`,
+        { email, password },
+      );
+      if (login.__typename !== "CurrentUser") {
+        throw new ShopApiError(login.message ?? "No se pudo ingresar", login.errorCode);
+      }
+    },
+
+    async register(input: { firstName: string; lastName: string; email: string; phone: string; password: string }) {
+      const { registerCustomerAccount: r } = await request<{
+        registerCustomerAccount: { __typename: string; errorCode?: string; message?: string };
+      }>(
+        `mutation Register($input: RegisterCustomerInput!) {
+          registerCustomerAccount(input: $input) {
+            __typename
+            ... on ErrorResult { errorCode message }
+          }
+        }`,
+        {
+          input: {
+            firstName: input.firstName,
+            lastName: input.lastName,
+            emailAddress: input.email,
+            phoneNumber: input.phone,
+            password: input.password,
+          },
+        },
+      );
+      if (r.__typename !== "Success") throw new ShopApiError(r.message ?? "No se pudo crear la cuenta", r.errorCode);
+    },
+
+    async logout(): Promise<void> {
+      await request("mutation Logout { logout { success } }");
+    },
+
+    /** Pedidos del cliente en todas las tiendas, del más reciente al más viejo. */
+    async orders(): Promise<OrderSummary[]> {
+      const { sporaOrders } = await request<{ sporaOrders: Parameters<typeof toOrderSummary>[0][] }>(
+        SPORA_ORDERS_QUERY,
+      );
+      return sporaOrders.map(toOrderSummary);
+    },
+
+    async saveAddress(address: Address): Promise<void> {
+      await request(
+        "mutation SaveAddress($input: CreateAddressInput!) { createCustomerAddress(input: $input) { id } }",
+        { input: toAddressInput(address) },
+      );
+    },
+
+    async exchangeRate(): Promise<ExchangeRate> {
+      const { exchangeRate } = await request<{ exchangeRate: ExchangeRate }>(
+        "query Rate { exchangeRate { date rate } }",
+      );
+      return exchangeRate;
+    },
+
+    // ── Checkout: datos → envío → pago ────────────────────────────────────────────────────────────────────────
+    /** Comprador sin cuenta: datos de contacto del pedido. */
+    async setGuest(input: { email: string; firstName: string; lastName: string; phone: string }): Promise<void> {
+      const { setCustomerForOrder: r } = await request<{ setCustomerForOrder: RawOrderResult }>(
+        `mutation Guest($input: CreateCustomerInput!) { setCustomerForOrder(input: $input) { ${ORDER_RESULT} } }`,
+        {
+          input: {
+            emailAddress: input.email,
+            firstName: input.firstName,
+            lastName: input.lastName,
+            phoneNumber: input.phone,
+          },
+        },
+      );
+      orderResult(r);
+    },
+
+    async setShippingAddress(address: Address): Promise<Cart> {
+      const { setOrderShippingAddress: r } = await request<{ setOrderShippingAddress: RawOrderResult }>(
+        `mutation Ship($input: CreateAddressInput!) { setOrderShippingAddress(input: $input) { ${ORDER_RESULT} } }`,
+        { input: toAddressInput(address) },
+      );
+      return orderResult(r);
+    },
+
+    async shippingOptions(): Promise<ShippingOption[]> {
+      const { eligibleShippingMethods, activeOrder } = await request<{
+        eligibleShippingMethods: { id: string; name: string; description: string; priceWithTax: number }[];
+        activeOrder: { currencyCode: CurrencyCode } | null;
+      }>(
+        "query ShippingOptions { eligibleShippingMethods { id name description priceWithTax } activeOrder { currencyCode } }",
+      );
+      const currency = activeOrder?.currencyCode ?? "CRC";
+      return eligibleShippingMethods.map((m) => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        price: { amount: m.priceWithTax, currency },
+      }));
+    },
+
+    async setShippingMethod(id: string): Promise<Cart> {
+      const { setOrderShippingMethod: r } = await request<{ setOrderShippingMethod: RawOrderResult }>(
+        `mutation ShipMethod($id: [ID!]!) { setOrderShippingMethod(shippingMethodId: $id) { ${ORDER_RESULT} } }`,
+        { id: [id] },
+      );
+      return orderResult(r);
+    },
+
+    async paymentOptions(): Promise<PaymentOption[]> {
+      const { eligiblePaymentMethods } = await request<{
+        eligiblePaymentMethods: { code: string; name: string; description: string; isEligible: boolean }[];
+      }>("query PaymentOptions { eligiblePaymentMethods { code name description isEligible } }");
+      return eligiblePaymentMethods.map((m) => ({
+        code: m.code,
+        name: m.name,
+        description: m.description,
+        eligible: m.isEligible,
+      }));
+    },
+
+    /** Pasa el pedido a pago (ahí se guarda el tipo de cambio del día) y agrega el pago con el método elegido. */
+    async pay(method: string, metadata: Record<string, unknown> = {}): Promise<Cart> {
+      const { activeOrder } = await request<{ activeOrder: { state: string } | null }>(
+        "query State { activeOrder { state } }",
+      );
+      if (activeOrder?.state === "AddingItems") {
+        const { transitionOrderToState: t } = await request<{
+          transitionOrderToState: {
+            __typename: string;
+            errorCode?: string;
+            message?: string;
+            transitionError?: string;
+          };
+        }>(
+          `mutation ToPayment { transitionOrderToState(state: "ArrangingPayment") {
+            __typename
+            ... on OrderStateTransitionError { errorCode message transitionError }
+          } }`,
+        );
+        if (t.__typename !== "Order") throw new ShopApiError(t.transitionError ?? t.message ?? "", t.errorCode);
+      }
+      const { addPaymentToOrder: r } = await request<{ addPaymentToOrder: RawOrderResult }>(
+        `mutation Pay($input: PaymentInput!) { addPaymentToOrder(input: $input) { ${ORDER_RESULT} } }`,
+        { input: { method, metadata } },
+      );
+      return orderResult(r);
+    },
+
+    /** Un pedido de esta tienda por su código (el cliente dueño, o la misma sesión por un rato si fue sin cuenta). */
+    async orderByCode(code: string): Promise<Cart | null> {
+      try {
+        const { orderByCode } = await request<{ orderByCode: RawOrder | null }>(
+          `query OrderByCode($code: String!) { orderByCode(code: $code) { ${ORDER} } }`,
+          { code },
+        );
+        return orderByCode ? toCart(orderByCode) : null;
+      } catch (err) {
+        if (err instanceof ShopApiError && err.code === "FORBIDDEN") return null;
+        throw err;
+      }
     },
   };
 }

@@ -11,7 +11,10 @@
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
+    "@nestjs/core": "^12.0.1",
     "@nestjs/graphql": "~14.0.0",
+    "@spora/shared": "workspace:*",
+    "@spora/themes": "workspace:*",
     "@vendure/admin-ui-plugin": "3.8.2",
     "@vendure/asset-server-plugin": "3.8.2",
     "@vendure/common": "3.8.2",
@@ -19,16 +22,14 @@
     "graphql": "^16.14.2",
     "graphql-tag": "^2.12.6",
     "pg": "^8.16.0",
-    "typeorm": "^0.3.21",
-    "@spora/shared": "workspace:*",
-    "@spora/themes": "workspace:*"
+    "typeorm": "^0.3.21"
   },
   "devDependencies": {
+    "@types/express": "^5.0.0",
     "@types/node": "^22.15.0",
     "@vendure/testing": "3.8.2",
     "rimraf": "^6.0.0",
     "sql.js": "1.14.2",
-    "tsx": "^4.20.0",
-    "@types/express": "^5.0.0"
+    "tsx": "^4.20.0"
   }
 }

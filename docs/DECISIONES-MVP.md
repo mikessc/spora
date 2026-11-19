@@ -130,3 +130,69 @@ cómo revertirla.
 - **Decisión:** cualquier visitante puede previsualizar otro estilo con `?estilo=`. No cambia la tienda ni se indexa
   (la canónica no lleva el parámetro). Sirve para que el comercio compare estilos antes de elegir.
 - **Revertir:** aceptarlo solo con sesión del Admin.
+
+## M3
+
+### 2026-11-19 — Sesión compartida entre tiendas: `Domain` en la cookie
+- **Duda:** cómo compartir la Cuenta Spora entre `*.spora.localhost` sin tocar el Admin UI (que vive en `localhost`).
+- **Decisión:** Vendure pone la cookie `spora-sesion` sin dominio; el storefront le agrega `Domain=<dominio base>` al
+  reenviarla (proxy y SSR). Chrome la acepta para `spora.localhost` (probado en `pnpm e2e`): no hizo falta el
+  workaround de `/etc/hosts`.
+- **Revertir:** quitar `shareSessionCookie` (cada tienda tendría su propia sesión).
+
+### 2026-11-19 — El cliente se asigna a cada tienda donde opera
+- **Duda:** Vendure solo reconoce a un cliente en los canales a los que está asignado; con la sesión compartida, al
+  entrar a otra tienda el cliente "no existe" ahí.
+- **Decisión:** un interceptor de la Shop API lo asigna al canal de la tienda en su primera petición autenticada
+  (con caché en memoria). El historial de todas las tiendas sale de la query propia `sporaOrders`.
+- **Revertir:** quitar `CustomerChannelInterceptor` de `AccountPlugin`.
+
+### 2026-11-19 — Un carrito activo por sesión
+- **Duda:** Vendure guarda un solo pedido activo por sesión. Con sesión iniciada mantiene uno por tienda; sin sesión,
+  agregar algo en una segunda tienda reemplaza el carrito de la primera.
+- **Decisión:** se acepta para el MVP. Con Cuenta Spora no pasa.
+- **Revertir:** guardar el carrito anónimo por tienda en una cookie propia del storefront.
+
+### 2026-11-19 — Compra sin cuenta y registro sin verificación
+- **Decisión:** se puede comprar como invitado (correo y nombre en el pedido). `requireVerification: false`: la
+  cuenta queda activa al registrarse, porque el MVP no manda correos reales. Si alguien se registra después con el
+  mismo correo, Vendure le asocia los pedidos de invitado.
+- **Revertir:** `requireVerification: true` cuando haya correos transaccionales (fuera del MVP).
+
+### 2026-11-19 — Nomenclátor: copia de TrackingApp en `@spora/shared`
+- **Duda:** MVP.md pide reutilizar el de TrackingApp copiándolo o como paquete compartido.
+- **Decisión:** **copia** de los niveles provincia › cantón › distrito (563 áreas, 20 KB) en
+  `packages/shared/data/nomenclator-cr.json`, con los mismos códigos (distrito = código postal de 5 dígitos; los tres
+  distritos que comparten código postal llevan sufijo, igual que en TrackingApp). Se regenera con
+  `packages/shared/scripts/nomenclator-desde-trackingapp.mjs`. No se copian los barrios.
+- **Revertir:** publicar el nomenclátor como paquete compartido entre los dos repos.
+- **En la dirección de Vendure:** provincia → `province`, cantón → `city`, distrito → custom fields `district` y
+  `districtCode`, código postal → `postalCode`, señas → `streetLine1`.
+
+### 2026-11-19 — Distrito con un solo `<select>`
+- **Decisión:** un `<select>` de los 475 distritos agrupados por "Provincia › Cantón". Funciona sin JS y se busca
+  tecleando. Un selector en cascada sería una isla.
+- **Revertir:** isla con tres selects encadenados.
+
+### 2026-11-19 — Toda tienda nueva nace con envío propio, retiro y contra entrega
+- **Decisión:** `registerStore` crea "Envío a domicilio" (tarifa fija: ₡2 500 o $5), "Retiro en local" y "Contra
+  entrega". El comercio los ajusta en el Admin UI. M4 y M5 agregan los demás proveedores.
+- **Revertir:** quitar `createDefaultMethods`.
+
+### 2026-11-19 — Tipo de cambio: se pide al usarlo, una vez por día
+- **Decisión:** la primera petición del día de negocio (America/Costa_Rica) lo pide al BCCR (indicador 318, venta) y
+  lo guarda; si el BCCR falla, se usa el último conocido. Sin credenciales, se usa la tasa fija `BCCR_SIMULATED_RATE`.
+  No hay tarea programada.
+- **Cuentas con enteros:** la tasa se guarda como texto con hasta 4 decimales y se convierte con diezmilésimas.
+- **Revertir:** tarea programada de Vendure si se quiere tenerla lista a primera hora.
+
+### 2026-11-19 — Precio manual en la otra moneda: campo de la variante
+- **Duda:** Vendure soporta precios por moneda, pero exige uno en cada moneda activa del canal (o falla la consulta).
+- **Decisión:** custom field `otherCurrencyPrice` (entero, unidad menor) en la variante. Si está vacío, se convierte
+  con el tipo de cambio. Hoy solo se usa para mostrar; el cobro en la otra moneda llega con PayPal en M4.
+- **Revertir:** activar USD/CRC en el canal con una estrategia de precios que convierta los que falten.
+
+### 2026-11-19 — El pedido guarda el tipo de cambio al pasar a pago
+- **Decisión:** un `OrderProcess` guarda la tasa y su fecha en el pedido (`exchangeRate`, `exchangeRateDate`) al pasar
+  a `ArrangingPayment`. Moneda y monto los guarda Vendure.
+- **Revertir:** no aplica (regla de CLAUDE.md).

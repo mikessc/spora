@@ -21,6 +21,8 @@ export interface Variant {
   stockLevel: StockLevel;
   featuredAssetId: string | null;
   optionIds: string[];
+  /** Precio manual en la otra moneda (unidad menor); `null` = se convierte con el tipo de cambio. */
+  otherCurrencyPrice: number | null;
 }
 export interface Product {
   id: string;
@@ -79,29 +81,11 @@ export interface StoreCollection {
   marketplaceCategory: string | null;
 }
 
-export interface CartLine {
-  id: string;
-  quantity: number;
-  productName: string;
-  productSlug: string;
-  variantName: string;
-  image: string | null;
-  unitPrice: Money;
-  linePrice: Money;
-}
-export interface Cart {
-  code: string;
-  lines: CartLine[];
-  totalQuantity: number;
-  subTotal: Money;
-  total: Money;
-}
-
 /** "Camisetas & Polos" → "camisetas-polos". */
 export const slugify = (text: string): string =>
   text
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
