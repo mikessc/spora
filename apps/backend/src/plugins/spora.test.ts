@@ -417,6 +417,26 @@ describe("cuenta y checkout (M3)", () => {
   const ORDER = `code state currencyCode totalWithTax customFields { exchangeRate exchangeRateDate }`;
   const RESULT = `__typename ... on Order { ${ORDER} } ... on ErrorResult { errorCode message }`;
   const customer = { emailAddress: "rosa@correo.cr", firstName: "Rosa", lastName: "Vargas", password: "clave-segura" };
+  /** Los clientes que ve el comercio de Café Sur en el Admin. */
+  const cafeCustomers = async (): Promise<string[]> => {
+    await adminClient.asUserWithCredentials(admin.emailAddress, admin.password);
+    adminClient.setChannelToken("cafe-sur");
+    try {
+      const { customers } = await adminClient.query(gql`
+        query {
+          customers {
+            items {
+              emailAddress
+            }
+          }
+        }
+      `);
+      return customers.items.map((c: { emailAddress: string }) => c.emailAddress);
+    } finally {
+      adminClient.setChannelToken(DEFAULT_TOKEN);
+      await adminClient.asSuperAdmin();
+    }
+  };
 
   before(async () => {
     // Café Sur (USD) quedó suspendida en las pruebas de alta: se activa y se le crea un producto con stock.
@@ -522,14 +542,46 @@ describe("cuenta y checkout (M3)", () => {
     );
     shopClient.setChannelToken("cafe-sur");
     await shopClient.asUserWithCredentials(customer.emailAddress, customer.password);
-    const { activeCustomer } = await shopClient.query(gql`
+    const { sporaCustomer } = await shopClient.query(gql`
       query {
-        activeCustomer {
+        sporaCustomer {
           emailAddress
         }
       }
     `);
-    assert.equal(activeCustomer?.emailAddress, customer.emailAddress);
+    assert.equal(sporaCustomer?.emailAddress, customer.emailAddress);
+  });
+
+  test("privacidad: con sesión iniciada, visitar Café Sur y llenar el carrito no la comparte con la tienda", async () => {
+    shopClient.setChannelToken("cafe-sur");
+    const { product } = await shopClient.query(gql`
+      query {
+        product(slug: "cafe-500") {
+          variants {
+            id
+          }
+        }
+      }
+    `);
+    await shopClient.query(
+      gql`mutation ($id: ID!) { addItemToOrder(productVariantId: $id, quantity: 1) { ${RESULT} } }`,
+      { id: product.variants[0].id },
+    );
+    // El carrito queda a nombre de su cuenta (y sigue ahí en la próxima consulta)...
+    const { activeOrder } = await shopClient.query(gql`
+      query {
+        activeOrder {
+          totalQuantity
+          customer {
+            emailAddress
+          }
+        }
+      }
+    `);
+    assert.deepEqual(activeOrder, { totalQuantity: 1, customer: { emailAddress: customer.emailAddress } });
+    // ...pero la tienda no la ve entre sus clientes.
+    assert.ok(!(await cafeCustomers()).includes(customer.emailAddress));
+    await shopClient.query(gql`mutation { removeAllOrderLines { ${RESULT} } }`);
   });
 
   test("el pedido guarda moneda, monto y el tipo de cambio del día al pasar a pago", async () => {
@@ -588,6 +640,14 @@ describe("cuenta y checkout (M3)", () => {
     assert.equal(paid.state, "PaymentAuthorized");
     // 1 × $10 + $5 de envío (el cliente de pruebas abre una sesión nueva al ingresar: no trae el carrito anónimo).
     assert.equal(paid.totalWithTax, 1500);
+  });
+
+  test("privacidad: al hacer su primer pedido, Café Sur ya la ve entre sus clientes", async () => {
+    for (let i = 0; i < 50; i++) {
+      if ((await cafeCustomers()).includes(customer.emailAddress)) return;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.fail("el cliente no quedó asignado a la tienda al hacer el pedido");
   });
 
   test("el historial de la Cuenta Spora junta los pedidos de todas las tiendas", async () => {

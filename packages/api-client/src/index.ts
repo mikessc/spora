@@ -399,8 +399,8 @@ export function createShopClient({ url, channelToken, cookie, onSetCookie }: Sho
 
     // ── Cuenta Spora ──────────────────────────────────────────────────────────────────────────────────────────
     async customer(): Promise<Customer | null> {
-      const { activeCustomer } = await request<{ activeCustomer: RawCustomer | null }>(CUSTOMER_QUERY);
-      return activeCustomer ? toCustomer(activeCustomer) : null;
+      const { sporaCustomer } = await request<{ sporaCustomer: RawCustomer | null }>(CUSTOMER_QUERY);
+      return sporaCustomer ? toCustomer(sporaCustomer) : null;
     },
 
     /** Inicia sesión; lanza `ShopApiError` con el código de Vendure (INVALID_CREDENTIALS_ERROR…) si falla. */
@@ -455,10 +455,9 @@ export function createShopClient({ url, channelToken, cookie, onSetCookie }: Sho
     },
 
     async saveAddress(address: Address): Promise<void> {
-      await request(
-        "mutation SaveAddress($input: CreateAddressInput!) { createCustomerAddress(input: $input) { id } }",
-        { input: toAddressInput(address) },
-      );
+      await request("mutation SaveAddress($input: CreateAddressInput!) { sporaCreateAddress(input: $input) { id } }", {
+        input: toAddressInput(address),
+      });
     },
 
     async exchangeRate(): Promise<ExchangeRate> {

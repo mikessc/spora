@@ -201,8 +201,9 @@ export const toCart = (o: RawOrder): Cart => {
   };
 };
 
+// sporaCustomer y no activeCustomer: Vendure solo ve al cliente en las tiendas donde ya compró.
 export const CUSTOMER_QUERY = `query Customer {
-  activeCustomer {
+  sporaCustomer {
     firstName
     lastName
     emailAddress
