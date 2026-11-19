@@ -47,8 +47,9 @@ curl sin configurar nada.
 | Cliente nuevo | se crea en `/cuenta/registro` de cualquier tienda | |
 
 ## Tareas comunes
-- **Tema de la tienda:** Admin UI (como el comercio) → Configuración → Canales → la tienda → pestaña "Tienda": estilo,
-  color de marca, tipografía, logo, frase, textos y políticas.
+- **Tema de la tienda:** <http://localhost:3000/panel/tienda> con la sesión del comercio en el Admin UI: estilo, color
+  de marca, tipografía, logo, frase, textos, políticas y credenciales de TrackingApp (mutation `updateStoreSettings`).
+  El comercio no puede guardar el canal en el Admin UI: el resto (monedas, impuestos, código) es del admin de Spora.
 - **Dar de alta un comercio:** Admin API, como superadmin, mutation `registerStore` (crea comercio en estado
   `pendiente`, canal, bodega, rol y usuario). Para publicarla: Admin UI → Configuración → Vendedores → Estado
   `activo`.
@@ -72,7 +73,7 @@ curl sin configurar nada.
   Admin API, `simulateShipmentEvent(fulfillmentId, event)` con `en_camino`, `entregado`, `devuelto` o `cancelado`
   (con TrackingApp manda el webhook firmado al endpoint de la tienda).
 - TrackingApp real: `SPORA_ENVIOS_REALES=trackingapp` y `TRACKINGAPP_API_URL`; la llave de cliente y el secreto del
-  webhook van en el canal (pestaña "Envíos"). En TrackingApp se registra el webhook
+  webhook se cargan en `/panel/tienda`. En TrackingApp se registra el webhook
   `http://localhost:3000/webhooks/trackingapp/<tienda>`.
 
 ## Comisiones y marketplace

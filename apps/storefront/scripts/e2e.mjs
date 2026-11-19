@@ -608,6 +608,37 @@ try {
   assert.match(download.suggestedFilename(), /^comisiones-\d{4}-\d{2}\.csv$/);
   await panel.close();
   ok("panel de comisiones: el comercio ve su pedido entregado como facturable (8 %) y exporta el CSV");
+
+  // El comercio edita su tienda en /panel/tienda (updateStoreSettings; ya no tiene updateChannel).
+  const themePanel = await browser.newContext({ viewport });
+  const pt = await themePanel.newPage();
+  await pt.goto("http://localhost:3000/panel/tienda");
+  await pt.evaluate(() =>
+    fetch("/admin-api", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        query: 'mutation { login(username: "demo@spora.localhost", password: "demo1234") { __typename } }',
+      }),
+    }),
+  );
+  await pt.reload();
+  await pt.locator("#tienda:not([hidden])").waitFor();
+  const originalTagline = await pt.inputValue('[name="tagline"]');
+  const save = async (tagline) => {
+    await pt.fill('[name="tagline"]', tagline);
+    await pt.click("#tienda .primary");
+    await pt.locator("#listo", { hasText: "Guardado" }).waitFor();
+  };
+  await save("Frase de prueba del panel");
+  const hero = await browser.newPage();
+  await hero.goto(`${STORE}/`);
+  assert.match(await text(hero.locator(".store-hero")), /Frase de prueba del panel/);
+  await hero.close();
+  await save(originalTagline);
+  await themePanel.close();
+  ok("panel de la tienda: el comercio cambia la frase con updateStoreSettings y la tienda la muestra");
   // ── M7: compras en las cuatro tiendas ──────────────────────────────────────────────────────────────────────────
   const BARRO = STORE.replace("tienda-demo", "barro-telar");
   const VOLTIO = STORE.replace("tienda-demo", "voltio");

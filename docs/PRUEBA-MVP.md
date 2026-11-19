@@ -118,7 +118,8 @@ Use una ventana privada para comprar sin cuenta, o siga con el cliente de prueba
      tienda, igual que en producción.
 
 **Otras pantallas del comercio en el Admin UI:**
-- **Configuración → Canales → la tienda → "Tienda"**: estilo, color, tipografía, logo, textos y políticas.
+- **<http://localhost:3000/panel/tienda>** (misma sesión): estilo, color, tipografía, logo, textos, políticas y
+  credenciales de TrackingApp. Al guardar, la tienda cambia enseguida.
 - **Configuración → Métodos de pago / de envío**: cada proveedor y sus credenciales, que se guardan cifradas.
 
 ## 6. Comisiones

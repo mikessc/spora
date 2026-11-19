@@ -1,10 +1,12 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, type OnApplicationBootstrap } from "@nestjs/common";
 import { DEFAULT_CHANNEL_CODE } from "@vendure/common/lib/shared-constants";
 import {
   AdministratorService,
+  AssetService,
   type ID,
   Channel,
   ChannelService,
+  ConfigService,
   CurrencyCode,
   defaultShippingCalculator,
   defaultShippingEligibilityChecker,
@@ -12,16 +14,21 @@ import {
   manualFulfillmentHandler,
   PaymentMethodService,
   Permission,
+  PermissionDefinition,
+  RequestContextService,
   type RequestContext,
+  Role,
   RoleService,
   SellerService,
   ShippingMethodService,
   StockLocationService,
   TransactionalConnection,
   UserInputError,
+  UserService,
 } from "@vendure/core";
 import { businessDate, type CurrencyCode as SporaCurrency } from "@spora/shared";
-import { type DesignStyle } from "@spora/themes";
+import { type DesignStyle, fonts, isDesignStyle } from "@spora/themes";
+import { Like } from "typeorm";
 import { CommissionAgreement } from "../commissions/commissions.service";
 import { cashOnDeliveryHandler } from "../payments/handlers";
 import { zoneRateArgs, zoneRateCalculator } from "../shipping/providers";
@@ -43,7 +50,16 @@ export const sellerStatuses: SellerStatus[] = ["pendiente", "activo", "suspendid
 const RESERVED = new Set(["www", "admin", "api", "spora", "marketplace", "cuenta", "assets", "static", "mail"]);
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
 
-/** Lo que puede hacer el comercio en el Admin UI, siempre limitado a su canal. */
+/** Editar el tema, los textos y las credenciales de envío de su propia tienda (updateStoreSettings), nada más del canal. */
+export const updateStoreSettingsPermission = new PermissionDefinition({
+  name: "UpdateStoreSettings",
+  description: "Editar el tema, los textos y las credenciales de envío de la tienda",
+});
+
+/**
+ * Lo que puede hacer el comercio en el Admin UI, siempre limitado a su canal. Sin UpdateChannel: con él podría cambiar
+ * el comercio dueño, el código, el token, las monedas o los impuestos del canal.
+ */
 export const SELLER_PERMISSIONS: Permission[] = [
   Permission.Authenticated,
   Permission.CreateCatalog,
@@ -64,8 +80,26 @@ export const SELLER_PERMISSIONS: Permission[] = [
   Permission.ReadStockLocation,
   Permission.ReadSettings,
   Permission.ReadChannel,
-  Permission.UpdateChannel,
+  updateStoreSettingsPermission.Permission,
 ];
+
+/** Lo único del canal que el comercio puede cambiar. `undefined` = no se toca; `null` = se borra. */
+export interface StoreSettingsInput {
+  storeName?: string | null;
+  designStyle?: string | null;
+  primaryColor?: string | null;
+  font?: string | null;
+  logoId?: ID | null;
+  tagline?: string | null;
+  about?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  shippingPolicy?: string | null;
+  returnsPolicy?: string | null;
+  privacyPolicy?: string | null;
+  trackingAppKey?: string | null;
+  trackingAppWebhookSecret?: string | null;
+}
 
 export interface CreateStoreInput {
   /** Nombre del negocio (comercio) y de la tienda. */
@@ -81,7 +115,7 @@ export interface CreateStoreInput {
 }
 
 @Injectable()
-export class StoreService {
+export class StoreService implements OnApplicationBootstrap {
   constructor(
     @Inject(TransactionalConnection) private connection: TransactionalConnection,
     @Inject(SellerService) private sellers: SellerService,
@@ -91,7 +125,59 @@ export class StoreService {
     @Inject(AdministratorService) private administrators: AdministratorService,
     @Inject(ShippingMethodService) private shippingMethods: ShippingMethodService,
     @Inject(PaymentMethodService) private paymentMethods: PaymentMethodService,
+    @Inject(AssetService) private assets: AssetService,
+    @Inject(ConfigService) private config: ConfigService,
+    @Inject(UserService) private users: UserService,
+    @Inject(RequestContextService) private contexts: RequestContextService,
   ) {}
+
+  /** Los roles de comercio ya creados quedan con los permisos de hoy (p. ej. sin UpdateChannel). */
+  async onApplicationBootstrap() {
+    const roles = this.connection.rawConnection.getRepository(Role);
+    for (const role of await roles.findBy({ code: Like("tienda-%") })) {
+      if (role.permissions.join() !== SELLER_PERMISSIONS.join()) {
+        await roles.update({ id: role.id }, { permissions: SELLER_PERMISSIONS });
+      }
+    }
+  }
+
+  /**
+   * Tema, textos y credenciales de envío de la tienda activa (la del vendure-token). El permiso se revisa en ese canal,
+   * así que un comercio no llega a otra tienda. Las credenciales se cifran al guardar (ChannelSecrets).
+   */
+  async updateSettings(ctx: RequestContext, input: StoreSettingsInput): Promise<Channel> {
+    if (ctx.channel.code === DEFAULT_CHANNEL_CODE) throw new UserInputError("Indique la tienda con vendure-token");
+    const { logoId, ...fields } = input;
+    for (const [name, value] of Object.entries(fields)) {
+      if (typeof value === "string" && value.length > 5000) throw new UserInputError(`${name}: demasiado largo`);
+    }
+    if (fields.designStyle != null && !isDesignStyle(fields.designStyle)) {
+      throw new UserInputError(`Estilo desconocido: ${fields.designStyle}`);
+    }
+    if (fields.font != null && !(fields.font in fonts)) {
+      throw new UserInputError(`Tipografía desconocida: ${fields.font}`);
+    }
+    if (fields.primaryColor === "") fields.primaryColor = null;
+    if (fields.primaryColor != null && !/^#[0-9a-fA-F]{6}$/.test(fields.primaryColor)) {
+      throw new UserInputError("primaryColor: use un color hexadecimal como #1d6b4f");
+    }
+    if (logoId != null && !(await this.assets.findOne(ctx, logoId))) {
+      throw new UserInputError("Logo: imagen no encontrada en la tienda");
+    }
+    // ChannelService.update exige UpdateChannel, que el comercio no tiene: ya validado el permiso propio y los campos,
+    // se guarda como admin de Spora en el mismo canal.
+    const superadmin = await this.users.getUserByEmailAddress(
+      ctx,
+      this.config.authOptions.superadminCredentials.identifier,
+    );
+    const asSpora = await this.contexts.create({ apiType: "admin", user: superadmin, channelOrToken: ctx.channel });
+    const updated = await this.channels.update(asSpora, {
+      id: ctx.channelId,
+      customFields: { ...fields, ...(logoId !== undefined ? { logoId } : {}) },
+    });
+    if (!("id" in updated)) throw new UserInputError(updated.message);
+    return updated;
+  }
 
   /**
    * Alta de comercio: crea el comercio, su canal (la tienda) con su propia ubicación de stock, el rol limitado a ese

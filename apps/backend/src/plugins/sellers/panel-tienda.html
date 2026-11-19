@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="es-CR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mi tienda · Spora</title>
+    <style>
+      :root {
+        --fg: #1f1d1a;
+        --muted: #6b665e;
+        --line: #e4dfd7;
+        --bg: #faf8f5;
+        --accent: #1d6b4f;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        color: var(--fg);
+        background: var(--bg);
+      }
+      body {
+        max-width: 48rem;
+        margin: 0 auto;
+        padding: 1.5rem 1rem 3rem;
+      }
+      h1 {
+        margin: 0 0 0.25rem;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      form {
+        display: grid;
+        gap: 1rem;
+      }
+      fieldset {
+        display: grid;
+        gap: 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: 0.5rem;
+        background: #fff;
+        padding: 1rem;
+      }
+      label {
+        display: grid;
+        gap: 0.25rem;
+        font-size: 0.875rem;
+        color: var(--muted);
+      }
+      input,
+      select,
+      textarea,
+      button {
+        font: inherit;
+        padding: 0.45rem 0.6rem;
+        border: 1px solid var(--line);
+        border-radius: 0.4rem;
+        background: #fff;
+        color: var(--fg);
+      }
+      button.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+        cursor: pointer;
+        justify-self: start;
+      }
+      .error {
+        color: #b42318;
+      }
+      .ok {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Mi tienda</h1>
+    <p class="muted" id="quien">Cargando…</p>
+    <p class="error" id="error" role="alert"></p>
+
+    <form id="tienda" hidden>
+      <fieldset>
+        <legend>Tema</legend>
+        <label>Nombre de la tienda <input name="storeName" /></label>
+        <label
+          >Estilo de diseño
+          <select name="designStyle"></select
+        ></label>
+        <label>Color de marca <input name="primaryColor" placeholder="#1d6b4f" pattern="#[0-9a-fA-F]{6}" /></label>
+        <label
+          >Tipografía
+          <select name="font"></select
+        ></label>
+        <label
+          >Logo
+          <select name="logoId"></select
+        ></label>
+        <label>Frase de la tienda <input name="tagline" /></label>
+      </fieldset>
+      <fieldset>
+        <legend>Textos y contacto</legend>
+        <label>Sobre la tienda <textarea name="about" rows="3"></textarea></label>
+        <label>Correo de contacto <input name="contactEmail" type="email" /></label>
+        <label>Teléfono o WhatsApp <input name="contactPhone" /></label>
+        <label>Política de envíos <textarea name="shippingPolicy" rows="3"></textarea></label>
+        <label>Política de cambios y devoluciones <textarea name="returnsPolicy" rows="3"></textarea></label>
+        <label>Política de privacidad <textarea name="privacyPolicy" rows="3"></textarea></label>
+      </fieldset>
+      <fieldset>
+        <legend>Envíos: TrackingApp</legend>
+        <p class="muted">Se guardan cifradas. Déjelas vacías para no cambiarlas.</p>
+        <label>Llave de cliente <input name="trackingAppKey" type="password" autocomplete="off" /></label>
+        <label>Secreto del webhook <input name="trackingAppWebhookSecret" type="password" autocomplete="off" /></label>
+      </fieldset>
+      <button class="primary">Guardar</button>
+      <p class="ok" id="listo" role="status"></p>
+    </form>
+
+    <script>
+      // Usa la sesión del Admin UI (misma cookie, mismo origen) y guarda con updateStoreSettings.
+      const $ = (id) => document.getElementById(id);
+      const form = $("tienda");
+      const STYLES = ["suave", "minimal", "vibrante", "editorial", "pop"];
+      const FONTS = ["sistema", "clasica", "redondeada", "geometrica", "mono"];
+      const TEXT = ["storeName", "primaryColor", "tagline", "about", "contactEmail", "contactPhone"].concat([
+        "shippingPolicy",
+        "returnsPolicy",
+        "privacyPolicy",
+      ]);
+      const SECRETS = ["trackingAppKey", "trackingAppWebhookSecret"];
+      let token = null;
+
+      async function api(query, variables = {}) {
+        const res = await fetch("/admin-api", {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json", ...(token ? { "vendure-token": token } : {}) },
+          body: JSON.stringify({ query, variables }),
+        });
+        const body = await res.json();
+        if (body.errors) throw new Error(body.errors.map((e) => e.message).join("; "));
+        return body.data;
+      }
+      const options = (select, values, current) =>
+        (select.innerHTML = values
+          .map(([v, label]) => `<option value="${v}"${v === current ? " selected" : ""}>${label}</option>`)
+          .join(""));
+
+      async function start() {
+        const { me } = await api("{ me { identifier channels { code token permissions } } }");
+        const store = me?.channels.find(
+          (c) => c.permissions.includes("UpdateStoreSettings") && c.code !== "__default_channel__",
+        );
+        if (!store) {
+          $("quien").innerHTML =
+            'Ingrese en el <a href="/admin">Admin UI</a> con el usuario de su tienda y vuelva aquí.';
+          return;
+        }
+        token = store.token;
+        $("quien").textContent = `${me.identifier} · tienda ${store.code}`;
+        const { activeChannel, assets } = await api(`{
+          activeChannel { customFields { storeName designStyle primaryColor font logo { id } tagline about contactEmail
+            contactPhone shippingPolicy returnsPolicy privacyPolicy } }
+          assets(options: { take: 100 }) { items { id name } } }`);
+        const cf = activeChannel.customFields;
+        for (const name of TEXT) form.elements[name].value = cf[name] ?? "";
+        options(
+          form.elements.designStyle,
+          STYLES.map((s) => [s, s]),
+          cf.designStyle,
+        );
+        options(
+          form.elements.font,
+          FONTS.map((f) => [f, f]),
+          cf.font,
+        );
+        options(
+          form.elements.logoId,
+          [["", "Sin logo"]].concat(assets.items.map((a) => [a.id, a.name.replace(/[<>&"]/g, "")])),
+          cf.logo?.id ?? "",
+        );
+        form.hidden = false;
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        $("error").textContent = $("listo").textContent = "";
+        const input = { designStyle: form.elements.designStyle.value, font: form.elements.font.value };
+        for (const name of TEXT) input[name] = form.elements[name].value.trim() || null;
+        input.logoId = form.elements.logoId.value || null;
+        for (const name of SECRETS) if (form.elements[name].value) input[name] = form.elements[name].value;
+        try {
+          await api(`mutation ($input: StoreSettingsInput!) { updateStoreSettings(input: $input) { id } }`, { input });
+          for (const name of SECRETS) form.elements[name].value = "";
+          $("listo").textContent = "Guardado. Los cambios ya se ven en la tienda.";
+        } catch (err) {
+          $("error").textContent = err.message;
+        }
+      });
+      start().catch((err) => ($("error").textContent = err.message));
+    </script>
+  </body>
+</html>

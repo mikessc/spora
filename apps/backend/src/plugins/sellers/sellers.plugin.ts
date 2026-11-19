@@ -1,4 +1,14 @@
-import { Inject, Injectable, type MiddlewareConsumer, type NestMiddleware, type NestModule } from "@nestjs/common";
+import { readFileSync } from "node:fs";
+import {
+  Controller,
+  Get,
+  Header,
+  Inject,
+  Injectable,
+  type MiddlewareConsumer,
+  type NestMiddleware,
+  type NestModule,
+} from "@nestjs/common";
 import { Args, Mutation, Resolver } from "@nestjs/graphql";
 import {
   Allow,
@@ -15,7 +25,14 @@ import {
 import { designStyles, fonts } from "@spora/themes";
 import type { NextFunction, Request, Response } from "express";
 import gql from "graphql-tag";
-import { type CreateStoreInput, type SellerStatus, sellerStatuses, StoreService } from "./store.service";
+import {
+  type CreateStoreInput,
+  type SellerStatus,
+  sellerStatuses,
+  type StoreSettingsInput,
+  StoreService,
+  updateStoreSettingsPermission,
+} from "./store.service";
 
 declare module "@vendure/core/dist/entity/custom-entity-fields" {
   interface CustomSellerFields {
@@ -76,9 +93,28 @@ const adminApi = gql`
     commissionPercentage: String
     administrator: StoreAdministratorInput!
   }
+  "Lo que el comercio puede cambiar de su tienda. Un campo que no se manda no se toca; null lo borra."
+  input StoreSettingsInput {
+    storeName: String
+    designStyle: String
+    primaryColor: String
+    font: String
+    logoId: ID
+    tagline: String
+    about: String
+    contactEmail: String
+    contactPhone: String
+    shippingPolicy: String
+    returnsPolicy: String
+    privacyPolicy: String
+    trackingAppKey: String
+    trackingAppWebhookSecret: String
+  }
   extend type Mutation {
     "Alta de comercio: crea comercio (pendiente), canal, ubicación de stock, rol limitado y usuario administrador."
     registerStore(input: RegisterStoreInput!): Channel!
+    "Tema, textos y credenciales de envío de la tienda activa (vendure-token). Solo eso: el resto del canal es de Spora."
+    updateStoreSettings(input: StoreSettingsInput!): Channel!
   }
 `;
 
@@ -92,6 +128,25 @@ class StoreAdminResolver {
   registerStore(@Ctx() ctx: RequestContext, @Args("input") input: CreateStoreInput) {
     return this.stores.createStore(ctx, input);
   }
+
+  @Mutation()
+  @Allow(updateStoreSettingsPermission.Permission)
+  updateStoreSettings(@Ctx() ctx: RequestContext, @Args("input") input: StoreSettingsInput) {
+    return this.stores.updateSettings(ctx, input);
+  }
+}
+
+/** Página del comercio para editar su tienda (como el panel de comisiones: misma sesión que el Admin UI). */
+@Controller("panel")
+class StorePanelController {
+  private html = readFileSync(new URL("./panel-tienda.html", import.meta.url), "utf8");
+
+  @Get("tienda")
+  @Header("content-type", "text/html; charset=utf-8")
+  @Header("cache-control", "no-store")
+  page() {
+    return this.html;
+  }
 }
 
 /** Comercios y tiendas: alta, estados (`pendiente`, `activo`, `suspendido`) y bloqueo de tiendas no activas. */
@@ -99,8 +154,10 @@ class StoreAdminResolver {
   imports: [PluginCommonModule],
   providers: [StoreService],
   exports: [StoreService],
+  controllers: [StorePanelController],
   adminApiExtensions: { schema: adminApi, resolvers: [StoreAdminResolver] },
   configuration: (config) => {
+    config.authOptions.customPermissions.push(updateStoreSettingsPermission);
     config.customFields.Seller.push({
       name: "status",
       type: "string",
@@ -110,7 +167,8 @@ class StoreAdminResolver {
       options: sellerStatuses.map((value) => ({ value, label: es(value) })),
       requiresPermission: Permission.SuperAdmin,
     });
-    // El tema y los textos de la tienda (ADR 0005): el comercio los edita en el Admin UI, pestaña "Tienda".
+    // El tema y los textos de la tienda (ADR 0005). El comercio los edita en /panel/tienda (updateStoreSettings); en
+    // el Admin UI los ve, pero solo el admin de Spora guarda el canal.
     const tab = { tab: "Tienda" };
     const text = (name: string, label: string, ui: Record<string, unknown> = tab) =>
       ({ name, type: "text", nullable: true, label: es(label), ui }) as const;

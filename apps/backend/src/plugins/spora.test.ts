@@ -245,15 +245,19 @@ describe("alta de comercio", () => {
 
 describe("tema de la tienda (M2)", () => {
   const UPDATE_THEME = gql`
-    mutation ($id: ID!, $style: String, $color: String) {
-      updateChannel(input: { id: $id, customFields: { designStyle: $style, primaryColor: $color } }) {
-        __typename
-        ... on Channel {
-          customFields {
-            designStyle
-            primaryColor
-          }
+    mutation ($style: String, $color: String, $secret: String) {
+      updateStoreSettings(input: { designStyle: $style, primaryColor: $color, trackingAppWebhookSecret: $secret }) {
+        customFields {
+          designStyle
+          primaryColor
         }
+      }
+    }
+  `;
+  const UPDATE_CHANNEL = gql`
+    mutation ($input: UpdateChannelInput!) {
+      updateChannel(input: $input) {
+        __typename
       }
     }
   `;
@@ -268,21 +272,68 @@ describe("tema de la tienda (M2)", () => {
     }
   `;
 
-  test("el comercio cambia estilo y color de su tienda, pero no los de otro canal", async () => {
-    const { channels } = await adminClient.query(CHANNEL_IDS);
-    const own = channels.items.find((c: { code: string }) => c.code === "cafe-sur");
-    const other = channels.items.find((c: { code: string }) => c.code !== "cafe-sur");
-
+  test("el comercio cambia el tema de su tienda con updateStoreSettings, y las credenciales quedan cifradas", async () => {
     await adminClient.asUserWithCredentials(admin.emailAddress, admin.password);
     adminClient.setChannelToken("cafe-sur");
     try {
-      const { updateChannel } = await adminClient.query(UPDATE_THEME, { id: own.id, style: "pop", color: "#c8102e" });
-      assert.deepEqual(updateChannel.customFields, { designStyle: "pop", primaryColor: "#c8102e" });
+      const { updateStoreSettings } = await adminClient.query(UPDATE_THEME, {
+        style: "pop",
+        color: "#c8102e",
+        secret: "whsec_solo_de_prueba",
+      });
+      assert.deepEqual(updateStoreSettings.customFields, { designStyle: "pop", primaryColor: "#c8102e" });
+      await assert.rejects(adminClient.query(UPDATE_THEME, { color: "rojo; }" }), /primaryColor/);
+      await assert.rejects(adminClient.query(UPDATE_THEME, { style: "barroco" }), /Estilo desconocido/);
+    } finally {
+      adminClient.setChannelToken(testConfig.defaultChannelToken ?? "e2e-default-channel");
+      await adminClient.asSuperAdmin();
+    }
+    const [row] = await server.app
+      .get(TransactionalConnection)
+      .rawConnection.query(`select * from channel where code = 'cafe-sur'`);
+    const raw = JSON.stringify(row);
+    assert.ok(!raw.includes("whsec_solo_de_prueba") && raw.includes("enc:v1:"), raw);
+  });
+
+  test("prohibido: el comercio no usa updateChannel ni toca otro canal, ni manda campos que no son del tema", async () => {
+    await adminClient.query(REGISTER, {
+      input: {
+        name: "Otra Tienda",
+        slug: "otra-tienda",
+        baseCurrency: "CRC",
+        administrator: { ...admin, emailAddress: "duena@otra-tienda.cr" },
+      },
+    });
+    const { channels } = await adminClient.query(CHANNEL_IDS);
+    const own = channels.items.find((c: { code: string }) => c.code === "cafe-sur");
+
+    await adminClient.asUserWithCredentials(admin.emailAddress, admin.password);
+    try {
+      adminClient.setChannelToken("cafe-sur");
+      for (const input of [
+        { id: own.id, customFields: { designStyle: "minimal" } },
+        { id: own.id, sellerId: "1" },
+        { id: own.id, code: "otra", token: "otra" },
+        { id: own.id, defaultCurrencyCode: "CRC", availableCurrencyCodes: ["CRC"] },
+        { id: own.id, pricesIncludeTax: false },
+      ]) {
+        await assert.rejects(adminClient.query(UPDATE_CHANNEL, { input }), /not currently authorized/);
+      }
       await assert.rejects(
-        adminClient.query(UPDATE_THEME, { id: own.id, color: "rojo; }" }),
-        /primaryColor|patr|pattern/i,
+        adminClient.query(gql`
+          mutation {
+            updateStoreSettings(input: { sellerId: "1" }) {
+              id
+            }
+          }
+        `),
+        /sellerId/,
       );
-      await assert.rejects(adminClient.query(UPDATE_THEME, { id: other.id, style: "pop" }), /not currently authorized/);
+      // Otra tienda (el permiso se revisa en el canal del vendure-token).
+      for (const token of ["otra-tienda", testConfig.defaultChannelToken ?? "e2e-default-channel"]) {
+        adminClient.setChannelToken(token);
+        await assert.rejects(adminClient.query(UPDATE_THEME, { style: "pop" }), /not currently authorized/);
+      }
     } finally {
       adminClient.setChannelToken(testConfig.defaultChannelToken ?? "e2e-default-channel");
       await adminClient.asSuperAdmin();
