@@ -12,16 +12,27 @@ export class ProductPublishRule implements EntitySubscriberInterface<Product> {
     return Product;
   }
   beforeInsert(event: InsertEvent<Product>) {
-    assertPublishable(event.entity);
+    const { enabled, deletedAt, customFields } = event.entity;
+    assertPublishable({ enabled, deletedAt, category: customFields?.marketplaceCategory });
   }
   beforeUpdate(event: UpdateEvent<Product>) {
     // En un `update()` parcial (p. ej. la fusión de marcas) no viene `enabled`: no hay nada que validar.
-    if (event.entity && "enabled" in event.entity) assertPublishable(event.entity as Product);
+    const entity = event.entity as Partial<Product> | undefined;
+    if (!entity || !("enabled" in entity)) return;
+    // Si la actualización no trae la categoría (Vendure no siempre manda los custom fields), vale la ya guardada.
+    const saved = event.databaseEntity as Product | undefined;
+    const sent = entity.customFields as Partial<Product["customFields"]> | undefined;
+    assertPublishable({
+      enabled: entity.enabled,
+      deletedAt: entity.deletedAt ?? saved?.deletedAt ?? null,
+      category:
+        sent && "marketplaceCategory" in sent ? sent.marketplaceCategory : saved?.customFields?.marketplaceCategory,
+    });
   }
 }
 
-export function assertPublishable(product: Pick<Product, "enabled" | "deletedAt" | "customFields">) {
-  if (product.enabled && !product.deletedAt && !product.customFields?.marketplaceCategory) {
+export function assertPublishable(product: { enabled?: boolean; deletedAt?: Date | null; category?: string | null }) {
+  if (product.enabled && !product.deletedAt && !product.category) {
     throw new UserInputError("Asigne una categoría global al producto antes de publicarlo");
   }
 }

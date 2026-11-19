@@ -1,0 +1,29 @@
+{
+  "name": "@spora/marketplace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:client": "node scripts/build-client.mjs",
+    "build": "pnpm build:client",
+    "dev": "node scripts/build-client.mjs --watch --serve",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.0",
+    "@spora/api-client": "workspace:*",
+    "@spora/shared": "workspace:*",
+    "@spora/themes": "workspace:*",
+    "@spora/ui": "workspace:*",
+    "@spora/web": "workspace:*",
+    "hono": "^4.9.0",
+    "meilisearch": "^0.53.0",
+    "sibujs": "4.15.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.20.0"
+  }
+}

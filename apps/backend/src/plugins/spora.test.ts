@@ -9,6 +9,8 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { AccountPlugin } from "./account/account.plugin";
 import { CatalogPlugin } from "./catalog/catalog.plugin";
+import { CommissionsPlugin } from "./commissions/commissions.plugin";
+import { MarketplacePlugin } from "./marketplace/marketplace.plugin";
 import { CurrencyPlugin } from "./currency/currency.plugin";
 import { sign } from "./payments/gateways";
 import { PaymentsPlugin } from "./payments/payments.plugin";
@@ -19,8 +21,18 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 registerInitializer("sqljs", new SqljsInitializer(path.join(dir, "../../__data__")));
 
 process.env.BCCR_SIMULATED_RATE = "515.25";
+process.env.MEILI_HOST = ""; // sin Meilisearch en las pruebas: el índice se apaga
 const config = mergeConfig(testConfig, {
-  plugins: [SellersPlugin, CatalogPlugin, CurrencyPlugin, AccountPlugin, PaymentsPlugin, ShippingPlugin],
+  plugins: [
+    SellersPlugin,
+    CatalogPlugin,
+    CurrencyPlugin,
+    AccountPlugin,
+    PaymentsPlugin,
+    ShippingPlugin,
+    CommissionsPlugin,
+    MarketplacePlugin,
+  ],
   paymentOptions: { paymentMethodHandlers: [] },
   authOptions: { requireVerification: false },
 });
@@ -296,6 +308,18 @@ describe("catálogo", () => {
     await assert.rejects(
       adminClient.query(CREATE_PRODUCT, { enabled: true, slug: "categoria-falsa", category: "no-existe" }),
       /no existe/,
+    );
+    // Un borrador con categoría sí se publica después (regresión: el update no traía los custom fields).
+    const conCategoria = (
+      await adminClient.query(CREATE_PRODUCT, { enabled: false, slug: "borrador-con-categoria", category: "moda" })
+    ).createProduct;
+    assert.equal(
+      (await adminClient.query(UPDATE_PRODUCT, { id: conCategoria.id, enabled: true })).updateProduct.enabled,
+      true,
+    );
+    assert.equal(
+      (await adminClient.query(UPDATE_PRODUCT, { id: conCategoria.id, enabled: false })).updateProduct.enabled,
+      false,
     );
     const ok = (await adminClient.query(CREATE_PRODUCT, { enabled: true, slug: "vestido", category: "moda-mujer" }))
       .createProduct;
@@ -909,5 +933,118 @@ describe("envíos (M5)", () => {
   test("webhook con firma falsa → 401; de una tienda sin TrackingApp → 404", async () => {
     assert.equal((await postWebhook("cafe-sur", delivered(), "evento-2", "whsec_falso")).status, 401);
     assert.equal((await postWebhook(DEFAULT_TOKEN, delivered(), "evento-3")).status, 404);
+  });
+});
+
+describe("comisiones (M6)", () => {
+  const DEFAULT_TOKEN = testConfig.defaultChannelToken ?? "e2e-default-channel";
+  const month = businessDate().slice(0, 7);
+  const STATEMENT = gql`
+    query ($month: String!, $sellerId: ID) {
+      commissionStatement(month: $month, sellerId: $sellerId) {
+        totals {
+          currency
+          pendiente
+          facturable
+          facturado
+        }
+        entries {
+          orderCode
+          status
+          currency
+          baseAmount
+          percentage
+          amount
+          billingMonth
+        }
+      }
+    }
+  `;
+  let cafeSeller: string;
+
+  /** Los movimientos se crean con eventos de Vendure (asíncronos): se espera a que aparezcan. */
+  async function statementWhen(ready: (s: { entries: { status: string }[] }) => boolean) {
+    for (let i = 0; i < 50; i++) {
+      const { commissionStatement } = await adminClient.query(STATEMENT, { month, sellerId: cafeSeller });
+      if (ready(commissionStatement)) return commissionStatement;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error("Los movimientos de comisión no llegaron");
+  }
+
+  before(async () => {
+    await adminClient.asSuperAdmin();
+    const { channels } = await adminClient.query(gql`
+      query {
+        channels {
+          items {
+            code
+            seller {
+              id
+            }
+          }
+        }
+      }
+    `);
+    cafeSeller = channels.items.find((c: { code: string }) => c.code === "cafe-sur").seller.id;
+  });
+
+  test("cada pedido de Café Sur tiene su movimiento; el entregado es facturable este mes con copia del porcentaje", async () => {
+    const statement = await statementWhen((s) => s.entries.some((e) => e.status === "facturable"));
+    const billable = statement.entries.filter((e: { status: string }) => e.status === "facturable");
+    assert.equal(billable.length, 1);
+    // $10 de producto (sin envío) al 5 % por defecto = $0,50.
+    assert.deepEqual(billable[0], {
+      ...billable[0],
+      currency: "USD",
+      baseAmount: 1000,
+      percentage: "5",
+      amount: 50,
+      billingMonth: month,
+    });
+    assert.ok(statement.entries.some((e: { status: string }) => e.status === "pendiente"));
+  });
+
+  test("el comercio ve solo su estado de cuenta; el admin de Spora cierra el mes", async () => {
+    await adminClient.asUserWithCredentials(admin.emailAddress, admin.password);
+    adminClient.setChannelToken("cafe-sur");
+    try {
+      const { commissionStatement } = await adminClient.query(STATEMENT, { month });
+      assert.ok(commissionStatement.entries.length > 0);
+      await assert.rejects(adminClient.query(STATEMENT, { month, sellerId: "1" }), /not currently authorized/);
+      await assert.rejects(
+        adminClient.query(
+          gql`
+            mutation ($m: String!) {
+              closeCommissionMonth(month: $m) {
+                id
+              }
+            }
+          `,
+          { m: month },
+        ),
+        /not currently authorized/,
+      );
+    } finally {
+      adminClient.setChannelToken(DEFAULT_TOKEN);
+      await adminClient.asSuperAdmin();
+    }
+    const { closeCommissionMonth } = await adminClient.query(
+      gql`
+        mutation ($m: String!) {
+          closeCommissionMonth(month: $m) {
+            sellerId
+            currency
+            total
+            entryCount
+          }
+        }
+      `,
+      { m: month },
+    );
+    assert.deepEqual(closeCommissionMonth, [{ sellerId: cafeSeller, currency: "USD", total: 50, entryCount: 1 }]);
+    const after = await statementWhen(() => true);
+    assert.deepEqual(after.totals[0].facturado, 50);
+    assert.deepEqual(after.totals[0].facturable, 0);
   });
 });

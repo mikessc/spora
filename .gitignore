@@ -7,3 +7,4 @@ apps/backend/static/
 apps/storefront/public/cliente.js
 .vendure/
 apps/backend/__data__/
+apps/marketplace/public/marketplace.js

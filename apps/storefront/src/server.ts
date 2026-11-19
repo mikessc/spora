@@ -4,14 +4,12 @@ import { createShopClient, ShopApiError, type ShopClient, type Store } from "@sp
 import { parseCatalogQuery } from "@spora/shared";
 import { Hono } from "hono";
 import { renderToStringAsync } from "sibujs/ssr";
-import { registerAccountRoutes } from "./account";
+import { type Ctx, type Env, type Page, registerAccountRoutes, shareSessionCookie } from "@spora/web";
 import { registerCheckoutRoutes } from "./checkout";
-import type { Ctx, Env, Page } from "./context";
 import { documentHtml, sitemapXml, styleFor } from "./document";
 import { type PolicyPage, policyPages, Shell } from "./layout";
 import { CartPage, Listing, notFound, PolicyPageView, StoreIntro } from "./pages";
 import { ProductPage, productJsonLd } from "./product-page";
-import { shareSessionCookie } from "./session-cookie";
 import { storeSlugFromHost } from "./store-host";
 
 const SHOP_API = process.env.VENDURE_SHOP_API ?? "http://localhost:3000/shop-api";
@@ -272,7 +270,11 @@ app.get("/sitemap.xml", async (c) => {
   return c.body(sitemapXml(urls), 200, { "content-type": "application/xml; charset=utf-8" });
 });
 
-registerAccountRoutes(app, render, BASE_DOMAIN);
+registerAccountRoutes(
+  app,
+  render,
+  (token, url) => `${url.protocol}//${token}.${BASE_DOMAIN}${url.port ? `:${url.port}` : ""}`,
+);
 registerCheckoutRoutes(app, render);
 
 serve({ fetch: app.fetch, port: PORT }, ({ port }) =>

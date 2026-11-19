@@ -8,7 +8,7 @@ pnpm install
 cp apps/backend/.env.example apps/backend/.env   # opcional: sin .env se usan los valores de desarrollo
 pnpm db              # PostgreSQL (5433) y Meilisearch (7700) en Docker
 pnpm seed            # migraciones + datos de ejemplo (idempotente)
-pnpm dev             # Vendure + Admin UI (3000) y storefront (4000)
+pnpm dev             # Vendure + Admin UI (3000), storefront (4000) y marketplace (5000)
 ```
 
 Para empezar de cero: `pnpm db:reset && pnpm seed`.
@@ -16,6 +16,7 @@ Para empezar de cero: `pnpm db:reset && pnpm seed`.
 ## URLs
 | Qué | URL |
 | --- | --- |
+| Marketplace | <http://spora.localhost:5000/> |
 | Tienda demo (portada) | <http://tienda-demo.spora.localhost:4000/> |
 | Categoría con filtros | <http://tienda-demo.spora.localhost:4000/categoria/camisetas?color=negro> |
 | Ficha de producto | <http://tienda-demo.spora.localhost:4000/producto/camiseta-sibu> |
@@ -25,6 +26,8 @@ Para empezar de cero: `pnpm db:reset && pnpm seed`.
 | Otro estilo (vista previa) | agregar `?estilo=` con `suave`, `minimal`, `vibrante`, `editorial` o `pop` a cualquier página |
 | Sitemap / robots | <http://tienda-demo.spora.localhost:4000/sitemap.xml>, `/robots.txt` |
 | Admin UI (comercio y Spora) | <http://localhost:3000/admin> |
+| Panel de comisiones | <http://localhost:3000/panel/comisiones> (con la sesión del Admin UI) |
+| Meilisearch | <http://localhost:7700> (llave de desarrollo `solo-desarrollo-meili`) |
 | Admin API (GraphiQL) | <http://localhost:3000/admin-api> |
 | Shop API | <http://localhost:3000/shop-api> (header `vendure-token: <tienda>`) |
 
@@ -67,6 +70,12 @@ curl sin configurar nada.
 - TrackingApp real: `SPORA_ENVIOS_REALES=trackingapp` y `TRACKINGAPP_API_URL`; la llave de cliente y el secreto del
   webhook van en el canal (pestaña "Envíos"). En TrackingApp se registra el webhook
   `http://localhost:3000/webhooks/trackingapp/<tienda>`.
+
+## Comisiones y marketplace
+- Cada pedido genera su comisión; pasa a facturable cuando se entrega. El panel muestra el mes en curso; el admin de
+  Spora cierra el mes ("Cerrar el mes") y edita los acuerdos.
+- El índice del marketplace se reconstruye al arrancar Vendure y lo mantienen los eventos. Para forzarlo: Admin API,
+  `reindexMarketplace` (superadmin).
 
 ## Tipo de cambio
 Sin credenciales del BCCR se usa la tasa fija `BCCR_SIMULATED_RATE` (₡515,00 por defecto). Para la real, poner

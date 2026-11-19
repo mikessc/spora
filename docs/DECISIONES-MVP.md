@@ -284,3 +284,42 @@ cómo revertirla.
   el adaptador real responde "falta la integración". El peso sale del nuevo campo de la variante (500 g si no está).
 - **Pendiente:** conseguir el contrato del Web Service con Correos y escribir el adaptador real.
 - **Revertir:** no aplica.
+
+## M6
+
+### 2026-11-19 — Reglas de comisión
+- **Decisión:** la base es el **subtotal de productos sin envío**, en la moneda en que **entró el dinero** (el cobro
+  real del pago; un pedido en colones pagado por PayPal cuenta en dólares, convertido con la tasa del pedido). El
+  porcentaje es el del acuerdo vigente el día del pedido (copia en el movimiento). Pasa a facturable al **entregarse**,
+  en el mes de la entrega (hora de Costa Rica); se anula si se cancela o devuelve antes de facturarse. Sin acuerdo
+  propio rige `SPORA_COMISION_POR_DEFECTO`; `registerStore` crea el acuerdo inicial.
+- **"Factura" = estado de cuenta:** `closeCommissionMonth` agrupa lo facturable del mes por comercio y moneda y lo
+  marca facturado. No es la factura electrónica de Hacienda (fuera del MVP).
+- **Revertir:** cambiar `commissionBase` (p. ej. incluir el envío).
+
+### 2026-11-19 — Panel de comisiones fuera del Admin UI
+- **Duda:** una pantalla nueva en el Admin UI clásico exige compilarlo con `@vendure/ui-devkit` (Angular).
+- **Decisión:** página propia del backend en `/panel/comisiones`, mismo origen que el Admin UI: usa su sesión y consulta
+  la Admin API. El comercio ve solo su tienda; el admin de Spora ve todas, edita acuerdos y cierra el mes. CSV desde el
+  navegador; PDF con "Imprimir".
+- **Revertir:** extensión del Admin UI (o del Dashboard nuevo) con la misma API.
+
+### 2026-11-19 — Índice del marketplace
+- **Decisión:** el backend lee cada tienda por su **Shop API** (lo mismo que ve el cliente) y escribe en Meilisearch un
+  documento por producto (categoría con ancestras, atributos `talla:s`, precio en colones para filtrar entre monedas) y
+  uno por tienda. Lo actualizan los eventos de Vendure (producto, variante, stock, colecciones: reindexa esa tienda;
+  comercio o canal: todas), agrupados cada 500 ms. Al arrancar se reconstruye entero. Solo tiendas activas, productos
+  con categoría global y marcas aprobadas.
+- ponytail: reindexa la tienda completa por cada cambio; con catálogos grandes, actualizar solo el producto.
+- **Revertir:** no aplica.
+
+### 2026-11-19 — Marketplace como app aparte; `@spora/web` compartido
+- **Decisión:** `apps/marketplace` (Hono + SibuJS SSR) en `spora.localhost:5000`, como pide el PLAN §9. Lo que comparte
+  con el storefront (Cuenta Spora, cookie compartida, tipos del servidor) pasó a `packages/web`. Las facetas son
+  disyuntivas (una búsqueda por grupo elegido, con `multiSearch`) y el rango de precio se filtra en colones.
+- **Revertir:** servir el marketplace desde el storefront en el dominio raíz.
+
+### 2026-11-19 — Bug encontrado: publicar con `updateProduct`
+- **Qué:** la regla "sin categoría global no se publica" rechazaba publicar un producto que **sí** tenía categoría,
+  porque en ese `update` Vendure no manda los custom fields. Lo encontró el e2e del marketplace.
+- **Arreglo:** si la actualización no trae la categoría, vale la guardada (`databaseEntity`). Hay test de regresión.

@@ -52,6 +52,7 @@ const brands = ["Sibú", "Café Sur"];
 
 interface StoreSeed {
   slug: string;
+  commission: string;
   name: string;
   currency: Currency;
   style: DesignStyle;
@@ -97,6 +98,7 @@ const tilopay = {
 const stores: StoreSeed[] = [
   {
     slug: "tienda-demo",
+    commission: "8",
     name: "Tienda Demo",
     currency: "CRC",
     style: "suave",
@@ -140,6 +142,7 @@ const stores: StoreSeed[] = [
   },
   {
     slug: "cafe-sur",
+    commission: "6",
     name: "Café Sur",
     currency: "USD",
     style: "editorial",
@@ -172,6 +175,8 @@ const stores: StoreSeed[] = [
   },
 ];
 
+// El índice del marketplace lo reconstruye el server al arrancar: durante el seed los productos están a medio crear.
+process.env.MEILI_HOST = "";
 await runMigrations(config);
 const app = await bootstrap({ ...config, apiOptions: { ...config.apiOptions, port: 3999 } });
 try {
@@ -236,6 +241,7 @@ async function seedStore(seed: StoreSeed, ctx: RequestContext, connection: Trans
       slug: seed.slug,
       baseCurrency: seed.currency,
       designStyle: seed.style,
+      commissionPercentage: seed.commission,
       status: "activo",
       administrator: {
         firstName: seed.admin.firstName,

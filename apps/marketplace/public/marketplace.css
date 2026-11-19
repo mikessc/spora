@@ -1,0 +1,56 @@
+/* Marketplace: lo que no está en @spora/ui. Solo variables de @spora/themes. */
+.category-list,
+.store-grid {
+  display: grid;
+  gap: var(--sp-space);
+  margin: 0 0 calc(var(--sp-space) * 2);
+  padding: 0;
+  list-style: none;
+}
+.category-list {
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+}
+.category-list a,
+.store-card {
+  display: block;
+  padding: var(--sp-surface-padding);
+  padding: max(var(--sp-surface-padding), 1rem);
+  text-decoration: none;
+  background: var(--sp-color-surface);
+  border: max(var(--sp-border-width), 1px) solid var(--sp-border-color);
+  border-radius: var(--sp-radius);
+  box-shadow: var(--sp-shadow-sm);
+}
+.store-grid {
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+}
+.store-card__name {
+  margin: 0 0 0.35rem;
+  font-family: var(--sp-heading-font);
+}
+.store-card__tagline,
+.store-card__meta {
+  margin: 0;
+  color: var(--sp-color-muted);
+  font-size: var(--sp-text-sm);
+}
+.product-card__store {
+  margin: 0;
+  font-size: var(--sp-text-sm);
+  color: var(--sp-color-muted);
+}
+.filters__price {
+  display: grid;
+  gap: 0.25rem;
+  font-size: var(--sp-text-sm);
+}
+.filters__price input {
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+  border: 1px solid var(--sp-color-border);
+  border-radius: var(--sp-radius-sm);
+}
+.listing__more {
+  display: inline-block;
+  margin-top: var(--sp-space);
+}

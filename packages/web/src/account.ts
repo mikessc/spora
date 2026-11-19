@@ -154,7 +154,10 @@ const LOGIN_ERRORS: Record<string, string> = {
   NOT_VERIFIED_ERROR: "Falta verificar la cuenta.",
 };
 
-export function registerAccountRoutes(app: Hono<Env>, render: Render, baseDomain: string) {
+/** URL de una tienda (`token` = subdominio), según desde dónde se pide (la tienda misma o el marketplace). */
+export type StoreUrl = (token: string, requestUrl: URL) => string;
+
+export function registerAccountRoutes(app: Hono<Env>, render: Render, storeUrlFor: StoreUrl) {
   const back = (value: string | null | undefined) => safeReturnPath(value, "/cuenta");
 
   app.get("/cuenta/ingresar", (c) =>
@@ -231,7 +234,7 @@ export function registerAccountRoutes(app: Hono<Env>, render: Render, baseDomain
       if (!customer) return c.redirect("/cuenta/ingresar?volver=/cuenta", 303);
       const orders = await shop.orders();
       const url = new URL(c.req.url);
-      const storeUrl = (token: string) => `${url.protocol}//${token}.${baseDomain}${url.port ? `:${url.port}` : ""}`;
+      const storeUrl = (token: string) => storeUrlFor(token, url);
       return {
         content: () => AccountPage(customer, orders, storeUrl),
         meta: { title: `Mi cuenta · ${store.name}`, noindex: true },

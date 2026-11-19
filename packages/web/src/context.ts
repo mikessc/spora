@@ -1,7 +1,18 @@
 // Tipos que comparten el servidor y los módulos de rutas (cuenta, checkout).
 import type { ShopClient, Store } from "@spora/api-client";
 import type { Context } from "hono";
-import type { PageMeta } from "./document";
+
+/** Lo que una página aporta al `<head>`. */
+export interface PageMeta {
+  title: string;
+  description?: string | null;
+  /** URL absoluta canónica. */
+  canonical: string;
+  /** Datos estructurados (schema.org) de la página. */
+  jsonLd?: unknown;
+  /** Para resultados de búsqueda o páginas sin valor propio. */
+  noindex?: boolean;
+}
 
 export type Env = { Variables: { slug: string; shop: ShopClient; setCookies: string[] } };
 export type Ctx = Context<Env>;

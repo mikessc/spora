@@ -72,6 +72,8 @@ const adminApi = gql`
     slug: String!
     baseCurrency: StoreCurrency!
     designStyle: String
+    "Comisión negociada, p. ej. 7.5 (por defecto, la de SPORA_COMISION_POR_DEFECTO)."
+    commissionPercentage: String
     administrator: StoreAdministratorInput!
   }
   extend type Mutation {

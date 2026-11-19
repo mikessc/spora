@@ -19,7 +19,8 @@
     "sibujs": "4.15.2",
     "sibujs-ui": "1.10.0",
     "@spora/ui": "workspace:*",
-    "@spora/shared": "workspace:*"
+    "@spora/shared": "workspace:*",
+    "@spora/web": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

@@ -6,7 +6,10 @@ Etapas del MVP en [MVP.md](MVP.md); decisiones tomadas en el camino en [DECISION
 Cosas que funcionan en local pero hay que resolver antes de poner Spora en línea.
 - **Peso del JS del cliente:** 171 KB minificado / **58 KB gzip** por página. ~120 KB son del núcleo de SibuJS (su
   `dist` agrupa muchos módulos por chunk y el tree-shaking rinde poco) y 27 KB de `tailwind-merge`, que arrastra
-  sibujs-ui. Opciones: preguntar upstream, o no usar sibujs-ui dentro de las islas.
+  sibujs-ui. Opciones: preguntar upstream, o no usar sibujs-ui dentro de las islas. El marketplace, que solo mejora
+  los filtros, igual carga 114 KB.
+- **Meilisearch:** el marketplace usa la llave maestra en local; en línea, una llave de solo búsqueda
+  (`MEILI_SEARCH_KEY`) y otra con escritura solo para el backend.
 - **CSS completo de sibujs-ui (116 KB, incluye Preflight):** se carga entero porque no compilamos Tailwind. Compilar
   Tailwind v4 con solo las clases que usamos y nuestros tokens.
 - **Sombras fijas de sibujs-ui:** sus componentes traen sombras de Tailwind con valores fijos (no son variables), así
@@ -16,6 +19,34 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
   test canario en M3): con un
   workaround en los componentes. Reporte para upstream en
   [reportes/sibujs-checked-ssr.md](reportes/sibujs-checked-ssr.md).
+
+## 2026-11-19 — M6: comisiones y marketplace ✔
+- Hecho — **comisiones**:
+  - Acuerdos por comercio con vigencias (el admin de Spora los edita); `registerStore` crea el inicial.
+  - Un movimiento (`commissionEntry`) por pedido con **copia del porcentaje**, base (subtotal sin envío) y **moneda en
+    que entró el dinero**. `pendiente` → `facturable` al entregar (mes de la entrega, hora de CR) → `facturado` al
+    cerrar el mes; `anulado` si se cancela o devuelve.
+  - **Estado de cuenta mensual** por comercio y moneda, exportable a CSV y PDF, en el **panel**
+    `http://localhost:3000/panel/comisiones` (sesión del Admin UI): el comercio ve lo suyo en tiempo real; el admin
+    de Spora ve todo, edita acuerdos y cierra el mes.
+- Hecho — **marketplace** (`spora.localhost:5000`, `apps/marketplace`):
+  - Índice global en Meilisearch alimentado por eventos de Vendure (solo tiendas activas, productos con categoría
+    global y marcas aprobadas).
+  - Inicio, búsqueda con filtros por **categoría global, marca, atributo, tienda, moneda y precio** (facetas que no se
+    cierran al elegir), páginas de categoría y de marca, y directorio de tiendas. Cada producto lleva a su tienda.
+  - Cuenta Spora también en el marketplace. Lo compartido con el storefront está en `@spora/web`.
+- Bug encontrado por el e2e y corregido: publicar con `updateProduct` un producto con categoría fallaba (la regla no
+  veía los custom fields). Test de regresión agregado.
+- Tests: reglas de comisión con fechas fijas (**cambio de porcentaje a mitad de mes, pedido de fin de mes entregado al
+  mes siguiente, pedido en CRC pagado en USD**), documentos del índice y búsqueda del marketplace; en Vendure, movimiento
+  facturable tras el webhook de entrega, permisos del comercio y cierre del mes. `pnpm e2e` (23 recorridos) suma:
+  marketplace entre tiendas, índice que sigue a la tienda (despublicar/publicar), cuenta en el marketplace y panel de
+  comisiones con CSV.
+- Cómo probarlo: [LOCAL.md](LOCAL.md).
+- Pendiente:
+  - Panel de comisiones dentro del Admin UI (hoy es una página aparte con la misma sesión).
+  - El JS de los filtros del marketplace pesa 114 KB (núcleo de SibuJS); ver "Antes de producción".
+- Sigue: **M7**, datos de ejemplo, pruebas de punta a punta y guía de prueba.
 
 ## 2026-11-19 — M5: envíos ✔
 - Hecho:

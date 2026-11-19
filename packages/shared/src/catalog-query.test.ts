@@ -9,6 +9,7 @@ const product = (slug: string, attributes: CatalogProduct["attributes"], descrip
   description,
   image: null,
   brand: null,
+  category: null,
   collectionSlugs: [],
   priceFrom: null,
   available: true,

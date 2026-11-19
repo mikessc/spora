@@ -66,6 +66,8 @@ export interface CatalogProduct {
   description: string;
   image: string | null;
   brand: string | null;
+  /** Categoría global del marketplace (slug). */
+  category: string | null;
   collectionSlugs: string[];
   /** El precio más bajo entre sus variantes. */
   priceFrom: Money | null;

@@ -151,6 +151,7 @@ const CATALOG_QUERY = /* GraphQL */ `
         description
         customFields {
           brand
+          marketplaceCategory
         }
         featuredAsset {
           preview
@@ -224,7 +225,7 @@ interface RawCatalogProduct {
   name: string;
   slug: string;
   description: string;
-  customFields: { brand: string | null };
+  customFields: { brand: string | null; marketplaceCategory: string | null };
   featuredAsset: { preview: string } | null;
   collections: { slug: string }[];
   optionGroups: { customFields: { attribute: string | null }; options: { id: string; name: string }[] }[];
@@ -245,6 +246,7 @@ const toCatalogProduct = (p: RawCatalogProduct): CatalogProduct => {
     description: htmlToParagraphs(p.description).join(" "),
     image: p.featuredAsset?.preview ?? null,
     brand: p.customFields.brand,
+    category: p.customFields.marketplaceCategory,
     collectionSlugs: p.collections.map((c) => c.slug),
     priceFrom: cheapest ? { amount: cheapest.priceWithTax, currency: cheapest.currencyCode } : null,
     available: p.variants.some((v) => v.stockLevel !== "OUT_OF_STOCK"),

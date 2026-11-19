@@ -1,7 +1,7 @@
 // Páginas de la tienda (salvo la ficha, en product-page.ts). Solo servidor.
 import type { Cart, CatalogProduct, Store } from "@spora/api-client";
 import { type CatalogQuery, facets, filterCatalog, formatMoney } from "@spora/shared";
-import { FilterPanel, ProductGrid } from "@spora/ui";
+import { facetGroups, FilterPanel, ProductGrid } from "@spora/ui";
 import {
   a,
   button,
@@ -47,7 +47,7 @@ export function Listing({ title, products, query, action, intro }: ListingProps)
     intro ?? null,
     h1("listing__title", title),
     div("listing__body", [
-      available.length ? FilterPanel({ facets: available, action, q: query.q }) : null,
+      available.length ? FilterPanel({ groups: facetGroups(available), action, hidden: { q: query.q } }) : null,
       section({ class: "listing__results", "aria-live": "polite" }, [
         p("listing__count", found.length === 1 ? "1 producto" : `${found.length} productos`),
         found.length

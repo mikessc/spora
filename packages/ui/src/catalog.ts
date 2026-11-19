@@ -25,29 +25,44 @@ export function ProductGrid(products: CatalogProduct[]) {
   );
 }
 
+/** Un grupo de casillas: `name` es el campo del formulario (`talla`, `categoria`, `tienda`…). */
+export interface FilterGroup {
+  name: string;
+  label: string;
+  values: { value: string; label: string; count: number; selected: boolean }[];
+}
+
+/** Las facetas de atributos comunes de una tienda, como grupos de filtros. */
+export const facetGroups = (facets: Facet[]): FilterGroup[] =>
+  facets.map((f) => ({ name: f.attribute, label: f.label, values: f.values }));
+
 export interface FilterPanelProps {
-  facets: Facet[];
+  groups: FilterGroup[];
   /** A dónde envía el formulario (la misma página). */
   action: string;
-  /** Búsqueda vigente, para no perderla al filtrar. */
-  q?: string;
+  /** Campos que se conservan al filtrar (la búsqueda, una categoría fija…). */
+  hidden?: Record<string, string>;
+  /** Controles extra al final (p. ej. rango de precio). */
+  extra?: Node[];
 }
 
 /**
  * Formulario GET: funciona sin JS (botón "Aplicar"). Con JS, la isla `filters` lo envía al cambiar una casilla.
  * `checked` va como atributo con `markIf`: SibuJS no lo serializa en el SSR.
  */
-export function FilterPanel({ facets, action, q }: FilterPanelProps) {
+export function FilterPanel({ groups, action, hidden = {}, extra = [] }: FilterPanelProps) {
+  const kept = Object.entries(hidden).filter(([, value]) => value);
+  const clearHref = kept.length ? `${action}?${new URLSearchParams(kept)}` : action;
   return form({ class: "filters", method: "get", action, "data-sibu-island": "filters", "aria-label": "Filtros" }, [
-    q ? input({ type: "hidden", name: "q", value: q }) : null,
-    ...facets.map((facet) =>
+    ...kept.map(([name, value]) => input({ type: "hidden", name, value })),
+    ...groups.map((group) =>
       fieldset("filters__group", [
-        legend("filters__legend", facet.label),
-        ...facet.values.map((value) =>
+        legend("filters__legend", group.label),
+        ...group.values.map((value) =>
           label("filters__option", [
             input({
               type: "checkbox",
-              name: facet.attribute,
+              name: group.name,
               value: value.value,
               onElement: markIf(value.selected, "checked"),
             }),
@@ -57,9 +72,10 @@ export function FilterPanel({ facets, action, q }: FilterPanelProps) {
         ),
       ]),
     ),
+    ...extra,
     div("filters__actions", [
       button({ class: "filters__apply", type: "submit" }, "Aplicar filtros"),
-      a({ class: "filters__clear", href: q ? `${action}?q=${encodeURIComponent(q)}` : action }, "Quitar filtros"),
+      a({ class: "filters__clear", href: clearHref }, "Quitar filtros"),
     ]),
   ]);
 }

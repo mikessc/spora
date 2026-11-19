@@ -505,6 +505,98 @@ try {
   ok(
     `envíos: cotiza zona y Correos; guía ${guide.trackingCode} en TrackingApp; webhooks firmados la entregan y liquidan la contra entrega; rastreo en la cuenta`,
   );
+  // ── M6: marketplace y comisiones ───────────────────────────────────────────────────────────────────────────────
+  const MARKET = process.env.MARKETPLACE_URL ?? "http://spora.localhost:5000";
+  const mk = await browser.newContext({ viewport });
+  const pk = await mk.newPage();
+  await pk.goto(`${MARKET}/`);
+  assert.match(await text(pk.locator(".store-hero")), /Las tiendas de Costa Rica/);
+  assert.deepEqual((await pk.locator(".store-card__name").allTextContents()).sort(), ["Café Sur", "Tienda Demo"]);
+  await pk.goto(`${MARKET}/buscar?color=rojo`);
+  assert.deepEqual((await pk.locator(".product-card__name").allTextContents()).sort(), ["Camiseta Sibú", "Gorra Sibú"]);
+  await pk.goto(`${MARKET}/buscar?moneda=USD`);
+  assert.match(await text(pk.locator(".product-card__price").first()), /\$.*≈ ₡/);
+  await pk.goto(`${MARKET}/categoria/moda`);
+  await filterOption(pk, "Tienda Demo").click();
+  await pk.waitForURL(/tienda=tienda-demo/);
+  assert.equal(await text(pk.locator(".listing__count")), "3 productos");
+  await pk.locator(".product-card__link", { hasText: "Gorra Sibú" }).click();
+  await pk.waitForURL(`${STORE}/producto/gorra-sibu`);
+  ok(
+    "marketplace: tiendas, búsqueda entre tiendas (color rojo), precio en USD con ≈ colones, categoría + tienda y enlace a la tienda",
+  );
+
+  // El índice lo alimentan los eventos de Vendure: si la tienda despublica un producto, sale del marketplace.
+  const { data: gorra } = await adminApi(
+    `{ products(options: { filter: { slug: { eq: "gorra-sibu" } } }) { items { id } } }`,
+    {},
+    merchant,
+  );
+  const setEnabled = (enabled) =>
+    adminApi(
+      `mutation ($id: ID!, $e: Boolean!) { updateProduct(input: { id: $id, enabled: $e }) { id } }`,
+      {
+        id: gorra.products.items[0].id,
+        e: enabled,
+      },
+      merchant,
+    );
+  const gorraInMarket = async () => {
+    await pk.goto(`${MARKET}/buscar?q=gorra`);
+    return (await pk.locator(".product-card__name").allTextContents()).includes("Gorra Sibú");
+  };
+  const eventually = async (check, expected) => {
+    for (let i = 0; i < 20; i++) {
+      if ((await check()) === expected) return;
+      await pk.waitForTimeout(500);
+    }
+    throw new Error(`el índice no llegó a ${expected}`);
+  };
+  await setEnabled(false);
+  await eventually(gorraInMarket, false);
+  await setEnabled(true);
+  await eventually(gorraInMarket, true);
+  ok("índice: despublicar un producto lo saca del marketplace y publicarlo lo devuelve (eventos de Vendure)");
+
+  // Cuenta Spora también en el marketplace (misma sesión que las tiendas).
+  await pk.goto(`${MARKET}/cuenta/ingresar`);
+  await pk.fill("#correo", mEmail);
+  await pk.fill("#clave", "clave-segura");
+  await pk.click(".form__submit");
+  await pk.waitForURL(`${MARKET}/cuenta`);
+  assert.match(await text(pk.locator(".account__orders")), new RegExp(shippedOrder));
+  assert.equal(
+    await pk.locator(`.account__orders a:text("${shippedOrder}")`).getAttribute("href"),
+    `${STORE}/pedido/${shippedOrder}`,
+  );
+  await mk.close();
+  ok("Cuenta Spora en el marketplace: ingreso y pedidos con enlace a cada tienda");
+
+  // Panel de comisiones del comercio: misma sesión que el Admin UI (se ingresa por la Admin API desde el navegador).
+  const panel = await browser.newContext({ viewport });
+  const pc = await panel.newPage();
+  await pc.goto("http://localhost:3000/panel/comisiones");
+  await pc.evaluate(() =>
+    fetch("/admin-api", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        query: 'mutation { login(username: "demo@spora.localhost", password: "demo1234") { __typename } }',
+      }),
+    }),
+  );
+  await pc.reload();
+  await pc.locator("#movimientos tr").first().waitFor();
+  assert.match(await text(pc.locator("#quien")), /tienda tienda-demo/);
+  const movements = await pc.locator("#movimientos tr").allTextContents();
+  const delivered = movements.find((m) => m.includes(shippedOrder)) ?? "";
+  assert.match(delivered.replace(/\s+/g, " "), /facturable.*₡6 500.*8 %.*₡520/); // gorra ₡6 500 al 8 %
+  assert.match(await text(pc.locator("#totales")), /CRC/);
+  const [download] = await Promise.all([pc.waitForEvent("download"), pc.click("#csv")]);
+  assert.match(download.suggestedFilename(), /^comisiones-\d{4}-\d{2}\.csv$/);
+  await panel.close();
+  ok("panel de comisiones: el comercio ve su pedido entregado como facturable (8 %) y exporta el CSV");
 } finally {
   await browser.close();
   console.log(results.join("\n"));

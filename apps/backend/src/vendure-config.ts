@@ -5,6 +5,8 @@ import { AdminUiPlugin } from "@vendure/admin-ui-plugin";
 import { DefaultJobQueuePlugin, DefaultSchedulerPlugin, type VendureConfig } from "@vendure/core";
 import { AccountPlugin } from "./plugins/account/account.plugin";
 import { CatalogPlugin } from "./plugins/catalog/catalog.plugin";
+import { CommissionsPlugin } from "./plugins/commissions/commissions.plugin";
+import { MarketplacePlugin } from "./plugins/marketplace/marketplace.plugin";
 import { CurrencyPlugin } from "./plugins/currency/currency.plugin";
 import { PaymentsPlugin } from "./plugins/payments/payments.plugin";
 import { ShippingPlugin } from "./plugins/shipping/shipping.plugin";
@@ -70,5 +72,7 @@ export const config: VendureConfig = {
     AccountPlugin,
     PaymentsPlugin,
     ShippingPlugin,
+    CommissionsPlugin,
+    MarketplacePlugin,
   ],
 };

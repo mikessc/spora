@@ -2,6 +2,7 @@
 export * from "./catalog";
 export * from "./catalog-query";
 export * from "./exchange";
+export * from "./marketplace";
 export * from "./money";
 export * from "./nomenclator";
 export * from "./order";

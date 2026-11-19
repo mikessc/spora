@@ -17,7 +17,7 @@ import {
 import { AddressFields, markIf } from "@spora/ui";
 import type { Hono } from "hono";
 import { a, button, div, fieldset, form, h1, h2, input, label, legend, li, main, ol, p, section, span } from "sibujs";
-import { type Ctx, type Env, field, type Render } from "./context";
+import { type Ctx, type Env, field, type Render } from "@spora/web";
 
 const STEPS = ["Datos", "Envío", "Pago"] as const;
 

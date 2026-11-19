@@ -20,8 +20,9 @@ import {
   TransactionalConnection,
   UserInputError,
 } from "@vendure/core";
-import { type CurrencyCode as SporaCurrency } from "@spora/shared";
+import { businessDate, type CurrencyCode as SporaCurrency } from "@spora/shared";
 import { type DesignStyle } from "@spora/themes";
+import { CommissionAgreement } from "../commissions/commissions.service";
 import { cashOnDeliveryHandler } from "../payments/handlers";
 import { zoneRateArgs, zoneRateCalculator } from "../shipping/providers";
 
@@ -74,6 +75,8 @@ export interface CreateStoreInput {
   baseCurrency: SporaCurrency;
   designStyle?: DesignStyle;
   status?: SellerStatus;
+  /** Comisión negociada (p. ej. "7.5"); sin valor, la de SPORA_COMISION_POR_DEFECTO. Rige desde hoy. */
+  commissionPercentage?: string;
   administrator: { firstName: string; lastName: string; emailAddress: string; password: string };
 }
 
@@ -134,6 +137,13 @@ export class StoreService {
     });
     await this.administrators.create(ctx, { ...input.administrator, roleIds: [role.id] });
     await this.createDefaultMethods(ctx, created.id, slug, input.baseCurrency);
+    await this.connection.getRepository(ctx, CommissionAgreement).save(
+      new CommissionAgreement({
+        sellerId: Number(seller.id),
+        percentage: input.commissionPercentage ?? process.env.SPORA_COMISION_POR_DEFECTO ?? "5",
+        validFrom: businessDate(),
+      }),
+    );
     return created;
   }
 
