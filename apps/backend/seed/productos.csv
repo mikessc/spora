@@ -1,0 +1,7 @@
+name,slug,description,assets,facets,optionGroups,optionValues,sku,price,taxCategory,stockOnHand,trackInventory,variantAssets,variantFacets
+Camiseta Sibú,camiseta-sibu,"<p>Camiseta de algodón peinado, hecha en Costa Rica. Corte recto y cuello redondo.</p>",camiseta-rojo-frente.svg|camiseta-rojo-espalda.svg|camiseta-azul-frente.svg|camiseta-azul-espalda.svg,,Talla|Color,S|Rojo,CAM-S-ROJ,12500,IVA,10,true,camiseta-rojo-frente.svg,
+,,,,,,M|Rojo,CAM-M-ROJ,12500,IVA,10,true,camiseta-rojo-frente.svg,
+,,,,,,L|Rojo,CAM-L-ROJ,13500,IVA,4,true,camiseta-rojo-frente.svg,
+,,,,,,S|Azul,CAM-S-AZU,12500,IVA,10,true,camiseta-azul-frente.svg,
+,,,,,,M|Azul,CAM-M-AZU,12500,IVA,10,true,camiseta-azul-frente.svg,
+,,,,,,L|Azul,CAM-L-AZU,13500,IVA,0,true,camiseta-azul-frente.svg,

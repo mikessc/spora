@@ -1,0 +1,27 @@
+{
+  "name": "@spora/storefront",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:client": "esbuild src/client.ts --bundle --format=iife --minify --target=es2022 --define:__SIBU_DEV__=false --outfile=public/cliente.js",
+    "build": "pnpm build:client",
+    "dev": "pnpm build:client && tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "check": "node scripts/check-fase0.mjs"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.0",
+    "@spora/api-client": "workspace:*",
+    "@spora/themes": "workspace:*",
+    "hono": "^4.9.0",
+    "sibujs": "4.15.2",
+    "sibujs-ui": "1.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "esbuild": "^0.25.0",
+    "playwright-core": "^1.55.0",
+    "tsx": "^4.20.0"
+  }
+}

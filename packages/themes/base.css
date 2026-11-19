@@ -1,0 +1,38 @@
+/*
+ * Paleta y tipografía por defecto + puente a los tokens de sibujs-ui.
+ * Los componentes solo leen variables --sp-*; los estilos (estilos/*.css) definen la forma.
+ */
+:root {
+  /* Paleta */
+  --sp-color-bg: #faf8f5;
+  --sp-color-surface: #ffffff;
+  --sp-color-fg: #1f1d1a;
+  --sp-color-muted: #6b665e;
+  --sp-color-border: #e4dfd7;
+  --sp-color-primary: #1d6b4f;
+  --sp-color-primary-fg: #ffffff;
+  --sp-color-danger: #b42318;
+  --sp-color-ok: #1d6b4f;
+
+  /* Tipografía */
+  --sp-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sp-font-heading: var(--sp-font);
+  --sp-text-sm: 0.875rem;
+  --sp-text-base: 1rem;
+  --sp-text-lg: 1.25rem;
+  --sp-text-xl: 1.75rem;
+
+  /* Tokens que lee sibujs-ui */
+  --radius: var(--sp-radius);
+  --background: var(--sp-color-bg);
+  --foreground: var(--sp-color-fg);
+  --primary: var(--sp-color-primary);
+  --primary-foreground: var(--sp-color-primary-fg);
+  --secondary: var(--sp-color-surface);
+  --secondary-foreground: var(--sp-color-fg);
+  --muted: var(--sp-color-bg);
+  --muted-foreground: var(--sp-color-muted);
+  --border: var(--sp-color-border);
+  --input: var(--sp-color-border);
+  --ring: var(--sp-color-primary);
+}

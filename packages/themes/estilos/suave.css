@@ -1,0 +1,14 @@
+/* Suave: muy redondeado, sombras difusas, sin bordes duros, espacios amplios. */
+:root {
+  --sp-radius: 1.25rem;
+  --sp-radius-sm: 0.75rem;
+  --sp-radius-pill: 999px;
+  --sp-border-width: 0px;
+  --sp-shadow: 0 10px 30px -12px rgb(31 29 26 / 0.18), 0 4px 10px -6px rgb(31 29 26 / 0.08);
+  --sp-shadow-sm: 0 4px 14px -6px rgb(31 29 26 / 0.16);
+  --sp-space: 1.25rem;
+  --sp-surface-padding: 1.5rem;
+  --sp-heading-weight: 650;
+  --sp-heading-transform: none;
+  --sp-heading-tracking: -0.01em;
+}
