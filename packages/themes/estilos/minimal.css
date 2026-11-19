@@ -4,11 +4,18 @@
   --sp-radius-sm: 0px;
   --sp-radius-pill: 0px;
   --sp-border-width: 1px;
+  --sp-border-color: var(--sp-color-border);
   --sp-shadow: none;
   --sp-shadow-sm: none;
   --sp-space: 1rem;
   --sp-surface-padding: 0;
+  --sp-heading-font: var(--sp-font);
   --sp-heading-weight: 400;
   --sp-heading-transform: uppercase;
   --sp-heading-tracking: 0.08em;
+  --sp-button-fg: var(--sp-color-bg);
+  --sp-button-bg: var(--sp-color-fg);
+  --sp-hero-bg: var(--sp-color-bg);
+  --sp-grid-min: 13rem;
+  --sp-image-ratio: 1;
 }

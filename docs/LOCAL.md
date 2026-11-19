@@ -16,8 +16,12 @@ Para empezar de cero: `pnpm db:reset && pnpm seed`.
 ## URLs
 | Qué | URL |
 | --- | --- |
-| Tienda demo | <http://tienda-demo.spora.localhost:4000/producto/camiseta-sibu> |
-| Otro estilo (vista previa) | <http://tienda-demo.spora.localhost:4000/producto/camiseta-sibu?estilo=minimal> |
+| Tienda demo (portada) | <http://tienda-demo.spora.localhost:4000/> |
+| Categoría con filtros | <http://tienda-demo.spora.localhost:4000/categoria/camisetas?color=negro> |
+| Ficha de producto | <http://tienda-demo.spora.localhost:4000/producto/camiseta-sibu> |
+| Carrito | <http://tienda-demo.spora.localhost:4000/carrito> |
+| Otro estilo (vista previa) | agregar `?estilo=` con `suave`, `minimal`, `vibrante`, `editorial` o `pop` a cualquier página |
+| Sitemap / robots | <http://tienda-demo.spora.localhost:4000/sitemap.xml>, `/robots.txt` |
 | Admin UI (comercio y Spora) | <http://localhost:3000/admin> |
 | Admin API (GraphiQL) | <http://localhost:3000/admin-api> |
 | Shop API | <http://localhost:3000/shop-api> (header `vendure-token: <tienda>`) |
@@ -32,6 +36,8 @@ curl sin configurar nada.
 | Comercio "Tienda Demo" (solo su canal) | `demo@spora.localhost` | `demo1234` |
 
 ## Tareas comunes
+- **Tema de la tienda:** Admin UI (como el comercio) → Configuración → Canales → la tienda → pestaña "Tienda": estilo,
+  color de marca, tipografía, logo, frase, textos y políticas.
 - **Dar de alta un comercio:** Admin API, como superadmin, mutation `registerStore` (crea comercio en estado
   `pendiente`, canal, bodega, rol y usuario). Para publicarla: Admin UI → Configuración → Vendedores → Estado
   `activo`.

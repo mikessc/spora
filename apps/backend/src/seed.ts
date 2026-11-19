@@ -4,18 +4,22 @@ import { fileURLToPath } from "node:url";
 import {
   bootstrap,
   ChannelService,
+  CollectionService,
   CurrencyCode,
   GlobalSettingsService,
   type InitialData,
   LanguageCode,
   ProductOptionGroup,
   ProductOptionGroupService,
+  productIdCollectionFilter,
+  ProductService,
   RequestContextService,
   runMigrations,
   TransactionalConnection,
   UserService,
 } from "@vendure/core";
 import { importProductsFromCsv, populateInitialData } from "@vendure/core/cli/index.js";
+import { slugify } from "@spora/shared";
 import { CatalogService } from "./plugins/catalog/catalog.service";
 import { StoreService } from "./plugins/sellers/store.service";
 import { config } from "./vendure-config";
@@ -106,6 +110,45 @@ try {
     for (const group of await connection.rawConnection.getRepository(ProductOptionGroup).find()) {
       const attribute = group.code.split("-").pop() as "talla" | "color";
       await groups.update(ctx, { id: group.id, customFields: { attribute } });
+    }
+    // Tema, textos y categorías propias de la tienda (mapeadas a las globales).
+    // Se vuelve a cargar el superadmin: el de arriba no conoce el canal recién creado.
+    const freshAdmin = await app.get(UserService).getUserById(ctx, superadmin!.id);
+    const storeCtx = await contexts.create({ apiType: "admin", user: freshAdmin, channelOrToken: DEMO });
+    await channels.update(storeCtx, {
+      id: store.id,
+      customFields: {
+        primaryColor: "#1d6b4f",
+        font: "sistema",
+        tagline: "Ropa de algodón hecha en Costa Rica",
+        about: "Somos un taller familiar en San José. Cortamos y cosemos cada pieza en pequeños lotes.",
+        contactEmail: "hola@tienda-demo.cr",
+        contactPhone: "+506 8888 0000",
+        shippingPolicy: "Enviamos a todo el país en 2 a 4 días hábiles.\nRetiro gratis en el taller.",
+        returnsPolicy: "Cambios de talla dentro de los 15 días, con la prenda sin usar y su etiqueta.",
+        privacyPolicy: "Usamos sus datos solo para preparar y enviar su pedido. No los compartimos con terceros.",
+      },
+    });
+    const productIds = async (...slugs: string[]) =>
+      Promise.all(slugs.map(async (slug) => (await app.get(ProductService).findOneBySlug(storeCtx, slug))!.id));
+    const collections: [string, string, string[]][] = [
+      ["Camisetas", "moda-hombre-camisetas", ["camiseta-sibu", "camiseta-volcan"]],
+      ["Accesorios", "moda-accesorios", ["gorra-sibu"]],
+    ];
+    for (const [name, marketplaceCategory, slugs] of collections) {
+      await app.get(CollectionService).create(storeCtx, {
+        translations: [{ languageCode: LanguageCode.es, name, slug: slugify(name), description: "" }],
+        filters: [
+          {
+            code: productIdCollectionFilter.code,
+            arguments: [
+              { name: "productIds", value: JSON.stringify(await productIds(...slugs)) },
+              { name: "combineWithAnd", value: "false" },
+            ],
+          },
+        ],
+        customFields: { marketplaceCategory },
+      });
     }
     console.log(`Tienda "${DEMO}" creada con ${result.imported} producto(s). Admin: demo@spora.localhost / demo1234`);
   }

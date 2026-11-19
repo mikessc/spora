@@ -5,3 +5,9 @@ Camiseta Sibú,camiseta-sibu,"<p>Camiseta de algodón peinado, hecha en Costa Ri
 ,,,,,,S|Azul,CAM-S-AZU,12500,IVA,10,true,camiseta-azul-frente.svg,,,
 ,,,,,,M|Azul,CAM-M-AZU,12500,IVA,10,true,camiseta-azul-frente.svg,,,
 ,,,,,,L|Azul,CAM-L-AZU,13500,IVA,0,true,camiseta-azul-frente.svg,,,
+Camiseta Volcán,camiseta-volcan,"<p>Camiseta de algodón con estampado del volcán Arenal. Tinta a base de agua.</p>",volcan-negro-frente.svg|volcan-negro-espalda.svg|volcan-verde-frente.svg|volcan-verde-espalda.svg,,Talla|Color,S|Negro,VOL-S-NEG,14000,IVA,8,true,volcan-negro-frente.svg,,moda-hombre-camisetas,sibu
+,,,,,,M|Negro,VOL-M-NEG,14000,IVA,8,true,volcan-negro-frente.svg,,,
+,,,,,,S|Verde,VOL-S-VER,14000,IVA,3,true,volcan-verde-frente.svg,,,
+,,,,,,M|Verde,VOL-M-VER,14000,IVA,0,true,volcan-verde-frente.svg,,,
+Gorra Sibú,gorra-sibu,"<p>Gorra de gabardina con visera curva y cierre ajustable.</p>",gorra-negro-frente.svg|gorra-negro-lado.svg|gorra-rojo-frente.svg|gorra-rojo-lado.svg,,Color,Negro,GOR-NEG,6500,IVA,15,true,gorra-negro-frente.svg,,moda-accesorios,sibu
+,,,,,,Rojo,GOR-ROJ,6500,IVA,15,true,gorra-rojo-frente.svg,,,

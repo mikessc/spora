@@ -1,10 +1,13 @@
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { createShopClient, ShopApiError, type ShopClient, type Store } from "@spora/api-client";
-import { type DesignStyle, isDesignStyle } from "@spora/themes";
-import { Hono } from "hono";
+import { parseCatalogQuery } from "@spora/shared";
+import { type Context, Hono } from "hono";
 import { renderToStringAsync } from "sibujs/ssr";
-import { ProductPage } from "./product-page";
+import { documentHtml, type PageMeta, sitemapXml, styleFor } from "./document";
+import { type PolicyPage, policyPages, Shell } from "./layout";
+import { CartPage, Listing, NotFoundPage, PolicyPageView, StoreIntro } from "./pages";
+import { ProductPage, productJsonLd } from "./product-page";
 import { storeSlugFromHost } from "./store-host";
 
 const SHOP_API = process.env.VENDURE_SHOP_API ?? "http://localhost:3000/shop-api";
@@ -12,7 +15,7 @@ const SHOP_API = process.env.VENDURE_SHOP_API ?? "http://localhost:3000/shop-api
 const BASE_DOMAIN = process.env.STORE_BASE_DOMAIN ?? "spora.localhost";
 const PORT = Number(process.env.PORT ?? 4000);
 
-type Env = { Variables: { slug: string; shop: ShopClient } };
+type Env = { Variables: { slug: string; shop: ShopClient; setCookies: string[] } };
 const app = new Hono<Env>();
 
 // Rutas relativas a apps/storefront (los scripts de pnpm corren ahí).
@@ -23,22 +26,34 @@ app.use("/ui/*", files("/ui", "../../packages/ui"));
 app.use("/temas/*", files("/temas", "../../packages/themes"));
 app.use("/vendor/*", files("/vendor", "./node_modules/sibujs-ui/dist"));
 
-const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
-
-const notFound = (title: string, text: string) =>
-  `<!doctype html><html lang="es-CR"><head><meta charset="utf-8" /><title>${escapeHtml(title)}</title></head>` +
-  `<body><main><h1>${escapeHtml(title)}</h1><p>${escapeHtml(text)}</p></main></body></html>`;
+const plainPage = (title: string, text: string) =>
+  `<!doctype html><html lang="es-CR"><head><meta charset="utf-8" /><title>${title}</title></head>` +
+  `<body><main><h1>${title}</h1><p>${text}</p></main></body></html>`;
 
 // El dominio del request decide la tienda (PLAN §2, multi-tenant). El token del canal es el subdominio.
 app.use("*", async (c, next) => {
   const slug = storeSlugFromHost(c.req.header("host") ?? "", BASE_DOMAIN);
-  if (!slug) return c.html(notFound("Tienda no encontrada", `Las tiendas viven en <tienda>.${BASE_DOMAIN}.`), 404);
+  if (!slug) {
+    return c.html(plainPage("Tienda no encontrada", `Las tiendas viven en &lt;tienda&gt;.${BASE_DOMAIN}.`), 404);
+  }
+  const setCookies: string[] = [];
   c.set("slug", slug);
-  c.set("shop", createShopClient({ url: SHOP_API, channelToken: slug }));
+  c.set("setCookies", setCookies);
+  c.set(
+    "shop",
+    createShopClient({
+      url: SHOP_API,
+      channelToken: slug,
+      cookie: c.req.header("cookie"),
+      onSetCookie: (cookies) => setCookies.push(...cookies),
+    }),
+  );
   await next();
+  // La sesión (y su carrito) la crea Vendure: sus cookies pasan al navegador tal cual.
+  for (const cookie of setCookies) c.header("set-cookie", cookie, { append: true });
 });
 
-// Proxy a la Shop API: el navegador nunca habla directo con Vendure ni elige el canal (lo fija el dominio).
+// Proxy a la Shop API para las islas: el navegador nunca habla directo con Vendure ni elige el canal.
 app.post("/shop-api", async (c) => {
   const res = await fetch(SHOP_API, {
     method: "POST",
@@ -55,52 +70,196 @@ app.post("/shop-api", async (c) => {
   return new Response(res.body, { status: res.status, headers });
 });
 
-function documentHtml(title: string, style: DesignStyle, body: string) {
-  return `<!doctype html>
-<html lang="es-CR">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeHtml(title)}</title>
-    <link rel="stylesheet" href="/vendor/sibujs-ui.css" />
-    <link rel="stylesheet" href="/temas/base.css" />
-    <link rel="stylesheet" href="/temas/estilos/${style}.css" />
-    <link rel="stylesheet" href="/ui/styles.css" />
-  </head>
-  <body>
-    ${body}
-    <script src="/static/cliente.js" defer></script>
-  </body>
-</html>`;
-}
-
 /** La tienda activa, o `null` si no existe o su comercio no está activo. */
 async function loadStore(shop: ShopClient): Promise<Store | null> {
   try {
     return await shop.store();
   } catch (err) {
-    if (err instanceof ShopApiError && (err.code === "STORE_NOT_ACTIVE" || err.code === "CHANNEL_NOT_FOUND"))
+    if (err instanceof ShopApiError && (err.code === "STORE_NOT_ACTIVE" || err.code === "CHANNEL_NOT_FOUND")) {
       return null;
+    }
     throw err;
   }
 }
 
-app.get("/producto/:slug", async (c) => {
+/** Una página carga sus datos y devuelve cómo construirse: el árbol se arma dentro del render SSR (con su DOM). */
+type Page = (store: Store) => Promise<{ content: () => Node; meta: Omit<PageMeta, "canonical">; status?: number }>;
+
+/** Arma una página de la tienda: datos del armazón en paralelo, SSR y documento con estilo y SEO. */
+async function render(c: Context<Env>, page: Page) {
   const shop = c.get("shop");
   const store = await loadStore(shop);
-  if (!store)
-    return c.html(notFound("Tienda no disponible", "Esta tienda no existe o todavía no está publicada."), 404);
-  const product = await shop.product(c.req.param("slug"));
-  if (!product) return c.html(notFound("Producto no encontrado", "Puede que ya no esté a la venta."), 404);
-  // `?estilo=` permite previsualizar otro estilo sin cambiar la tienda.
-  const requested = c.req.query("estilo");
-  const style: DesignStyle = isDesignStyle(requested)
-    ? requested
-    : isDesignStyle(store.designStyle)
-      ? store.designStyle
-      : "suave";
-  const { html } = await renderToStringAsync(() => ProductPage(product));
-  return c.html(documentHtml(`${product.name} · ${store.name}`, style, html));
+  if (!store) {
+    return c.html(plainPage("Tienda no disponible", "Esta tienda no existe o todavía no está publicada."), 404);
+  }
+  const [collections, cart, result] = await Promise.all([shop.collections(), shop.activeOrder(), page(store)]);
+  const url = new URL(c.req.url);
+  const { html } = await renderToStringAsync(() =>
+    Shell(
+      { store, collections, cartCount: cart?.totalQuantity ?? 0, query: url.searchParams.get("q") ?? "" },
+      result.content(),
+    ),
+  );
+  const canonical = `${url.origin}${url.pathname}`;
+  return c.html(
+    documentHtml(store, styleFor(store, c.req.query("estilo")), { ...result.meta, canonical }, html),
+    (result.status ?? 200) as 200,
+  );
+}
+
+const notFound = (text: string) => ({
+  content: () => NotFoundPage("No encontrado", text),
+  meta: { title: "No encontrado", noindex: true },
+  status: 404,
+});
+
+app.get("/", (c) =>
+  render(c, async (store) => {
+    const products = await c.get("shop").catalog();
+    return {
+      content: () =>
+        Listing({
+          title: "Productos",
+          products,
+          query: parseCatalogQuery(new URL(c.req.url).searchParams),
+          action: "/",
+          intro: StoreIntro(store),
+        }),
+      meta: { title: store.tagline ? `${store.name} · ${store.tagline}` : store.name, description: store.about },
+    };
+  }),
+);
+
+app.get("/categoria/:slug", (c) =>
+  render(c, async (store) => {
+    const shop = c.get("shop");
+    const slug = c.req.param("slug");
+    const [collections, products] = await Promise.all([shop.collections(), shop.catalog()]);
+    const collection = collections.find((col) => col.slug === slug);
+    if (!collection) return notFound("Esta categoría no existe en la tienda.");
+    return {
+      content: () =>
+        Listing({
+          title: collection.name,
+          products: products.filter((p) => p.collectionSlugs.includes(slug)),
+          query: parseCatalogQuery(new URL(c.req.url).searchParams),
+          action: `/categoria/${slug}`,
+        }),
+      meta: { title: `${collection.name} · ${store.name}`, description: store.tagline },
+    };
+  }),
+);
+
+app.get("/buscar", (c) =>
+  render(c, async (store) => {
+    const query = parseCatalogQuery(new URL(c.req.url).searchParams);
+    const products = await c.get("shop").catalog();
+    return {
+      content: () =>
+        Listing({
+          title: query.q ? `Resultados para “${query.q}”` : "Buscar",
+          products,
+          query,
+          action: "/buscar",
+        }),
+      meta: { title: `Buscar · ${store.name}`, noindex: true },
+    };
+  }),
+);
+
+app.get("/producto/:slug", (c) =>
+  render(c, async (store) => {
+    const shop = c.get("shop");
+    const [product, brands] = await Promise.all([shop.product(c.req.param("slug")), shop.brandNames()]);
+    if (!product) return notFound("Puede que este producto ya no esté a la venta.");
+    const url = new URL(c.req.url);
+    return {
+      content: () => ProductPage(product),
+      meta: {
+        title: `${product.name} · ${store.name}`,
+        description: product.descriptionHtml
+          .replace(/<[^>]*>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim(),
+        jsonLd: productJsonLd(product, store, `${url.origin}${url.pathname}`, brands.get(product.brand ?? "")),
+      },
+    };
+  }),
+);
+
+/** Avisos del carrito: la URL solo lleva un código, nunca texto (así nadie arma mensajes falsos con un enlace). */
+const NOTICES: Record<string, string> = {
+  "sin-stock": "Esa combinación no está disponible. Elija otra talla o color.",
+  error: "No se pudo actualizar el carrito. Intente de nuevo.",
+};
+
+app.get("/carrito", (c) =>
+  render(c, async (store) => {
+    const cart = await c.get("shop").activeOrder();
+    return {
+      content: () => CartPage(cart, NOTICES[c.req.query("aviso") ?? ""]),
+      meta: { title: `Carrito · ${store.name}`, noindex: true },
+    };
+  }),
+);
+
+// Agregar sin JS: el formulario de la ficha trae el producto y la opción elegida de cada grupo.
+app.post("/carrito/agregar", async (c) => {
+  const form = await c.req.formData();
+  const shop = c.get("shop");
+  const product = await shop.product(String(form.get("producto") ?? ""));
+  const chosen = product?.optionGroups.map((g) => String(form.get(`opcion-${g.id}`) ?? "")) ?? [];
+  const variant = product?.variants.find((v) => chosen.every((id) => v.optionIds.includes(id)));
+  if (!variant || variant.stockLevel === "OUT_OF_STOCK") return c.redirect("/carrito?aviso=sin-stock", 303);
+  try {
+    await shop.addItemToOrder(variant.id, 1);
+    return c.redirect("/carrito", 303);
+  } catch {
+    return c.redirect("/carrito?aviso=error", 303);
+  }
+});
+
+app.post("/carrito/linea", async (c) => {
+  const form = await c.req.formData();
+  const shop = c.get("shop");
+  const lineId = String(form.get("linea") ?? "");
+  const quantity = form.get("quitar") ? 0 : Math.max(0, Math.min(99, Math.trunc(Number(form.get("cantidad")))));
+  try {
+    if (!quantity || Number.isNaN(quantity)) await shop.removeOrderLine(lineId);
+    else await shop.adjustOrderLine(lineId, quantity);
+    return c.redirect("/carrito", 303);
+  } catch {
+    return c.redirect("/carrito?aviso=error", 303);
+  }
+});
+
+app.get("/politicas/:page", (c) =>
+  render(c, async (store) => {
+    const page = c.req.param("page") as PolicyPage;
+    if (!(page in policyPages) || !store.policies[page]) return notFound("Esta tienda no publicó esa política.");
+    return {
+      content: () => PolicyPageView(store, page),
+      meta: { title: `${policyPages[page]} · ${store.name}` },
+    };
+  }),
+);
+
+app.get("/robots.txt", (c) => c.text(`User-agent: *\nAllow: /\nSitemap: ${new URL(c.req.url).origin}/sitemap.xml\n`));
+
+app.get("/sitemap.xml", async (c) => {
+  const shop = c.get("shop");
+  const store = await loadStore(shop);
+  if (!store) return c.text("", 404);
+  const origin = new URL(c.req.url).origin;
+  const [collections, products] = await Promise.all([shop.collections(), shop.catalog()]);
+  const policies = (Object.keys(policyPages) as PolicyPage[]).filter((key) => store.policies[key]);
+  const urls = [
+    `${origin}/`,
+    ...collections.map((col) => `${origin}/categoria/${col.slug}`),
+    ...products.map((p) => `${origin}/producto/${p.slug}`),
+    ...policies.map((key) => `${origin}/politicas/${key}`),
+  ];
+  return c.body(sitemapXml(urls), 200, { "content-type": "application/xml; charset=utf-8" });
 });
 
 serve({ fetch: app.fetch, port: PORT }, ({ port }) =>

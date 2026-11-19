@@ -1,0 +1,21 @@
+/* Pop: bordes gruesos, sombras duras sin desenfoque, mayúsculas con carácter. */
+:root {
+  --sp-radius: 0.5rem;
+  --sp-radius-sm: 0.35rem;
+  --sp-radius-pill: 0.5rem;
+  --sp-border-width: 3px;
+  --sp-border-color: var(--sp-color-fg);
+  --sp-shadow: 6px 6px 0 var(--sp-color-fg);
+  --sp-shadow-sm: 3px 3px 0 var(--sp-color-fg);
+  --sp-space: 1.25rem;
+  --sp-surface-padding: 1.5rem;
+  --sp-heading-font: var(--sp-font);
+  --sp-heading-weight: 900;
+  --sp-heading-transform: uppercase;
+  --sp-heading-tracking: 0.02em;
+  --sp-button-fg: var(--sp-color-primary-fg);
+  --sp-button-bg: var(--sp-color-primary);
+  --sp-hero-bg: color-mix(in oklab, var(--sp-color-primary) 22%, var(--sp-color-bg));
+  --sp-grid-min: 14rem;
+  --sp-image-ratio: 1;
+}

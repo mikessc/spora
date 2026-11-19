@@ -96,3 +96,37 @@ cómo revertirla.
   distintos. Node en Windows no resuelve `*.localhost`, pero solo lo necesita el navegador: el storefront habla con
   Vendure en `localhost`.
 - **Revertir:** `STORE_BASE_DOMAIN` cambia el dominio base.
+
+## M2
+
+### 2026-11-19 — Listados y búsqueda de la tienda en memoria
+- **Duda:** usar el `DefaultSearchPlugin` de Vendure, Meilisearch o filtrar en el storefront.
+- **Decisión:** el storefront pide el catálogo publicado de la tienda (de a 100) y filtra en memoria con
+  `filterCatalog` / `facets` de `@spora/shared`. Los filtros por atributo salen de los grupos de opciones; dentro de
+  un atributo suman (O), entre atributos se exigen todos (Y). Se filtra por producto, no por variante. El marketplace
+  (M6) usa Meilisearch.
+- **Revertir:** cambiar `catalog()` por una consulta a Meilisearch con el filtro `store = <tienda>`.
+
+### 2026-11-19 — Comprar sin JS: formularios
+- **Decisión:** el carrito, la cantidad, quitar y "agregar" desde la ficha son formularios POST → redirección
+  (`/carrito/agregar`, `/carrito/linea`). Las islas solo mejoran: agregar sin recargar, contador del encabezado y
+  filtros que se envían solos. Los avisos del carrito viajan como código fijo (`?aviso=sin-stock`), nunca como texto.
+- **Revertir:** no aplica (las islas ya cubren el caso con JS).
+
+### 2026-11-19 — Tema: campos del canal y tipografías del sistema
+- **Decisión:** estilo, color de marca (validado con patrón `#RRGGBB`), tipografía, logo, frase, textos y políticas
+  son campos del canal (pestaña "Tienda" del Admin UI). El storefront vuelve a validar el color antes de ponerlo en
+  CSS. Las tipografías son pilas de fuentes del sistema: nada de fuentes externas.
+- **Capas:** la tipografía de la tienda manda en el cuerpo; el estilo `editorial` define la de los títulos (serif).
+  Los estilos no traen colores propios: `vibrante` mezcla el color de marca (`color-mix`).
+- **Revertir:** fuentes web en `@spora/themes/fonts` si alguna tienda las necesita.
+
+### 2026-11-19 — La cola de trabajos corre en el server
+- **Duda:** Vendure procesa colecciones e índices en un *worker*; no había ninguno.
+- **Decisión:** `JobQueueService.start()` en el mismo proceso del server (`src/index.ts`).
+- **Revertir:** `bootstrapWorker(config)` en un proceso aparte cuando haya carga.
+
+### 2026-11-19 — `?estilo=` sigue siendo público
+- **Decisión:** cualquier visitante puede previsualizar otro estilo con `?estilo=`. No cambia la tienda ni se indexa
+  (la canónica no lleva el parámetro). Sirve para que el comercio compare estilos antes de elegir.
+- **Revertir:** aceptarlo solo con sesión del Admin.

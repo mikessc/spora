@@ -220,6 +220,53 @@ describe("alta de comercio", () => {
   });
 });
 
+describe("tema de la tienda (M2)", () => {
+  const UPDATE_THEME = gql`
+    mutation ($id: ID!, $style: String, $color: String) {
+      updateChannel(input: { id: $id, customFields: { designStyle: $style, primaryColor: $color } }) {
+        __typename
+        ... on Channel {
+          customFields {
+            designStyle
+            primaryColor
+          }
+        }
+      }
+    }
+  `;
+  const CHANNEL_IDS = gql`
+    query {
+      channels {
+        items {
+          id
+          code
+        }
+      }
+    }
+  `;
+
+  test("el comercio cambia estilo y color de su tienda, pero no los de otro canal", async () => {
+    const { channels } = await adminClient.query(CHANNEL_IDS);
+    const own = channels.items.find((c: { code: string }) => c.code === "cafe-sur");
+    const other = channels.items.find((c: { code: string }) => c.code !== "cafe-sur");
+
+    await adminClient.asUserWithCredentials(admin.emailAddress, admin.password);
+    adminClient.setChannelToken("cafe-sur");
+    try {
+      const { updateChannel } = await adminClient.query(UPDATE_THEME, { id: own.id, style: "pop", color: "#c8102e" });
+      assert.deepEqual(updateChannel.customFields, { designStyle: "pop", primaryColor: "#c8102e" });
+      await assert.rejects(
+        adminClient.query(UPDATE_THEME, { id: own.id, color: "rojo; }" }),
+        /primaryColor|patr|pattern/i,
+      );
+      await assert.rejects(adminClient.query(UPDATE_THEME, { id: other.id, style: "pop" }), /not currently authorized/);
+    } finally {
+      adminClient.setChannelToken(testConfig.defaultChannelToken ?? "e2e-default-channel");
+      await adminClient.asSuperAdmin();
+    }
+  });
+});
+
 describe("catálogo", () => {
   test("las categorías hijas llevan el camino en el slug", async () => {
     const moda = (await adminClient.query(CREATE_CATEGORY, { name: "Moda" })).createMarketplaceCategory;

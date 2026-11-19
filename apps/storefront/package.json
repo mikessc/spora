@@ -3,12 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:client": "esbuild src/client.ts --bundle --format=iife --minify --target=es2022 --define:__SIBU_DEV__=false --outfile=public/cliente.js",
+    "build:client": "node scripts/build-client.mjs",
     "build": "pnpm build:client",
-    "dev": "pnpm build:client && tsx watch src/server.ts",
+    "dev": "node scripts/build-client.mjs --watch --serve",
     "start": "tsx src/server.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "e2e": "node scripts/check-fase0.mjs",
+    "e2e": "node scripts/e2e.mjs",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {

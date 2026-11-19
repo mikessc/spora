@@ -1,0 +1,29 @@
+/* Vibrante: degradados del color de marca, brillo y esquinas generosas. */
+:root {
+  --sp-radius: 1rem;
+  --sp-radius-sm: 0.6rem;
+  --sp-radius-pill: 999px;
+  --sp-border-width: 0px;
+  --sp-border-color: var(--sp-color-border);
+  --sp-shadow: 0 12px 32px -10px color-mix(in oklab, var(--sp-color-primary) 45%, transparent);
+  --sp-shadow-sm: 0 6px 16px -8px color-mix(in oklab, var(--sp-color-primary) 55%, transparent);
+  --sp-space: 1.25rem;
+  --sp-surface-padding: 1.5rem;
+  --sp-heading-font: var(--sp-font);
+  --sp-heading-weight: 800;
+  --sp-heading-transform: none;
+  --sp-heading-tracking: -0.02em;
+  --sp-button-fg: var(--sp-color-primary-fg);
+  --sp-button-bg: linear-gradient(
+    135deg,
+    var(--sp-color-primary),
+    color-mix(in oklch, var(--sp-color-primary) 55%, white)
+  );
+  --sp-hero-bg: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--sp-color-primary) 30%, var(--sp-color-bg)),
+    color-mix(in oklch, var(--sp-color-primary) 8%, var(--sp-color-bg))
+  );
+  --sp-grid-min: 14rem;
+  --sp-image-ratio: 1;
+}

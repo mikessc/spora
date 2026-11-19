@@ -2,6 +2,7 @@ import { Inject, Injectable, type MiddlewareConsumer, type NestMiddleware, type 
 import { Args, Mutation, Resolver } from "@nestjs/graphql";
 import {
   Allow,
+  Asset,
   ConfigService,
   Ctx,
   LanguageCode,
@@ -11,7 +12,7 @@ import {
   Transaction,
   VendurePlugin,
 } from "@vendure/core";
-import { designStyles } from "@spora/themes";
+import { designStyles, fonts } from "@spora/themes";
 import type { NextFunction, Request, Response } from "express";
 import gql from "graphql-tag";
 import { type CreateStoreInput, type SellerStatus, sellerStatuses, StoreService } from "./store.service";
@@ -23,6 +24,16 @@ declare module "@vendure/core/dist/entity/custom-entity-fields" {
   interface CustomChannelFields {
     storeName: string | null;
     designStyle: string;
+    primaryColor: string | null;
+    font: string;
+    logo: Asset | null;
+    tagline: string | null;
+    about: string | null;
+    contactEmail: string | null;
+    contactPhone: string | null;
+    shippingPolicy: string | null;
+    returnsPolicy: string | null;
+    privacyPolicy: string | null;
   }
 }
 
@@ -97,15 +108,45 @@ class StoreAdminResolver {
       options: sellerStatuses.map((value) => ({ value, label: es(value) })),
       requiresPermission: Permission.SuperAdmin,
     });
+    // El tema y los textos de la tienda (ADR 0005): el comercio los edita en el Admin UI, pestaña "Tienda".
+    const tab = { tab: "Tienda" };
+    const text = (name: string, label: string, ui: Record<string, unknown> = tab) =>
+      ({ name, type: "text", nullable: true, label: es(label), ui }) as const;
     config.customFields.Channel.push(
-      { name: "storeName", type: "string", nullable: true, label: es("Nombre de la tienda") },
+      { name: "storeName", type: "string", nullable: true, label: es("Nombre de la tienda"), ui: tab },
       {
         name: "designStyle",
         type: "string",
         defaultValue: "suave",
         label: es("Estilo de diseño"),
         options: designStyles.map((value) => ({ value, label: es(value) })),
+        ui: tab,
       },
+      {
+        name: "primaryColor",
+        type: "string",
+        nullable: true,
+        pattern: "^#[0-9a-fA-F]{6}$",
+        label: es("Color de marca"),
+        description: es("Hexadecimal, p. ej. #1d6b4f. Vacío: la paleta por defecto."),
+        ui: tab,
+      },
+      {
+        name: "font",
+        type: "string",
+        defaultValue: "sistema",
+        label: es("Tipografía"),
+        options: Object.keys(fonts).map((value) => ({ value, label: es(value) })),
+        ui: tab,
+      },
+      { name: "logo", type: "relation", entity: Asset, nullable: true, label: es("Logo"), ui: tab },
+      { name: "tagline", type: "string", nullable: true, label: es("Frase de la tienda"), ui: tab },
+      text("about", "Sobre la tienda", { ...tab, component: "textarea-form-input" }),
+      { name: "contactEmail", type: "string", nullable: true, label: es("Correo de contacto"), ui: tab },
+      { name: "contactPhone", type: "string", nullable: true, label: es("Teléfono o WhatsApp"), ui: tab },
+      text("shippingPolicy", "Política de envíos", { ...tab, component: "textarea-form-input" }),
+      text("returnsPolicy", "Política de cambios y devoluciones", { ...tab, component: "textarea-form-input" }),
+      text("privacyPolicy", "Política de privacidad", { ...tab, component: "textarea-form-input" }),
     );
     return config;
   },

@@ -1,7 +1,7 @@
 import { formatMoney, type Money } from "@spora/shared";
 import { div, onMount, p, signal } from "sibujs";
 import { Button } from "sibujs-ui";
-import { onVariant, type SelectedVariant } from "./variant-event";
+import { emitCart, onVariant, type SelectedVariant } from "./variant-event";
 
 export interface AddToCartProps {
   variant: SelectedVariant | null;
@@ -23,6 +23,7 @@ export function AddToCart(props: AddToCartProps) {
     try {
       const cart = await props.onAdd(v.id);
       setStatus("done");
+      emitCart(cart.totalQuantity);
       setMessage(`Agregado. Carrito: ${cart.totalQuantity} artículo(s), ${formatMoney(cart.total)}.`);
     } catch {
       setStatus("error");
@@ -35,8 +36,15 @@ export function AddToCart(props: AddToCartProps) {
       {
         class: "add-to-cart__button",
         size: "lg",
+        // Sin JS el botón envía el formulario de la página (POST /carrito/agregar); con JS lo resuelve la isla.
+        type: "submit",
         disabled: () => !variant()?.available || status() === "adding",
-        on: { click: add },
+        on: {
+          click: (event: Event) => {
+            event.preventDefault();
+            void add();
+          },
+        },
       },
       [() => (status() === "adding" ? "Agregando…" : variant()?.available ? "Agregar al carrito" : "Agotado")],
     ),

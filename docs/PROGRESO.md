@@ -16,6 +16,34 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
   workaround en los componentes. Reporte para upstream en
   [reportes/sibujs-checked-ssr.md](reportes/sibujs-checked-ssr.md).
 
+## 2026-11-19 — M2: storefront multi-tenant y estilos ✔
+- Hecho:
+  - **Páginas de la tienda** (SSR, todas funcionan sin JS): portada (frase y presentación), categoría con **filtros por
+    atributo común** (talla, color…), búsqueda dentro de la tienda (sin tildes ni mayúsculas), ficha, **carrito**
+    (cantidad y quitar) y políticas de envíos, devoluciones y privacidad. Encabezado con buscador, contador del
+    carrito y menú de categorías; pie con políticas y contacto.
+  - **Comprar sin JS**: la ficha es un formulario (opciones + botón); el carrito usa formularios POST → redirección.
+    Con JS, las islas agregan sin recargar y actualizan el contador del encabezado.
+  - **Islas nuevas** (`enhance`): filtros que se envían solos y contador del carrito. Hidratación sin cambios visibles
+    también en los listados.
+  - **Los 5 estilos**: `suave`, `minimal`, `vibrante`, `editorial` y `pop`, con el mismo juego de variables (un test
+    lo exige). **Paleta** (color de marca, con texto legible calculado) y **tipografía** (pilas del sistema) como capas
+    independientes.
+  - **Tema desde el panel del comercio**: campos del canal en el Admin UI, pestaña "Tienda" (estilo, color,
+    tipografía, logo, frase, textos, contacto y políticas). El comercio solo puede editar su canal.
+  - **SEO**: título y descripción por página, canónica, Open Graph, JSON-LD `Product` con un `Offer` por variante,
+    `sitemap.xml` y `robots.txt` por tienda, `noindex` en búsqueda y carrito.
+  - Seed con 3 productos, 2 categorías de tienda (mapeadas a globales) y el tema de la tienda demo. La cola de
+    trabajos de Vendure corre en el server. `pnpm dev` recompila las islas al guardar.
+- Tests: filtros y facetas, paleta y estilos (Vitest); tema por canal y permisos (Vendure en memoria). `pnpm e2e`
+  recorre en Chrome: dominio, ficha y portada sin JS, hidratación sin cambios visibles, islas, filtros con y sin JS,
+  búsqueda, carrito completo sin JS, aviso de agotado, JSON-LD, sitemap y los 5 estilos con el mismo HTML.
+- Cómo probarlo: [LOCAL.md](LOCAL.md).
+- Pendiente:
+  - El carrito no cotiza envío todavía (M3/M5) y no hay botón de pago (M3).
+  - Las páginas piden el catálogo completo en cada request (sin caché); bien para tiendas de cientos de productos.
+- Sigue: **M3**, Cuenta Spora y checkout.
+
 ## 2026-11-19 — M1: comercios, tiendas y catálogo ✔
 - Hecho:
   - **Alta de comercio** (`registerStore`, Admin API, superadmin): crea comercio, canal (moneda base CRC o USD),
@@ -39,7 +67,7 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
 - Pendiente:
   - En el Admin UI la categoría global y la marca se escriben como slug (no hay selector) y no hay pantallas para
     aprobar o fusionar marcas: se hace por la Admin API. Ver [DECISIONES-MVP.md](DECISIONES-MVP.md).
-  - `pnpm dev` no recompila el JS del cliente al editar islas (hay que correr `build:client`).
+  - ~~`pnpm dev` no recompila el JS del cliente al editar islas~~ (resuelto en M2).
 - Sigue: **M2**, storefront multi-tenant y estilos.
 
 ## 2026-11-19 — M0: monorepo y prueba de SibuJS ✔
