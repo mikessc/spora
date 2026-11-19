@@ -196,3 +196,49 @@ cómo revertirla.
 - **Decisión:** un `OrderProcess` guarda la tasa y su fecha en el pedido (`exchangeRate`, `exchangeRateDate`) al pasar
   a `ArrangingPayment`. Moneda y monto los guarda Vendure.
 - **Revertir:** no aplica (regla de CLAUDE.md).
+
+## M4
+
+### 2026-11-19 — La interfaz común de pagos es la de Vendure, más un "siguiente paso"
+- **Duda:** cómo lograr que agregar un proveedor no toque el checkout (CLAUDE.md).
+- **Decisión:** cada proveedor es un `PaymentMethodHandler`. Lo que el cliente hace después va en `metadata.public`
+  con un formato único: `listo` (contra entrega), `instrucciones` + comprobante (SINPE, transferencia) o `redirigir`
+  (PayPal, Tilopay). El storefront solo interpreta ese formato. Un proveedor nuevo es un handler más.
+- **Revertir:** no aplica.
+
+### 2026-11-19 — Pagos con pasarela: estado propio `EnPasarela`
+- **Duda:** Vendure crea el pago en `Created` y exige pasar a otro estado; `Authorized` daría el pedido por confirmado
+  antes de que el cliente pague.
+- **Decisión:** proceso de pagos con el estado `EnPasarela` (`Created → EnPasarela → Settled | Declined`). El pedido
+  sigue en `ArrangingPayment` hasta que vuelve el cliente. A la vuelta, `completeExternalPayment` **confirma con la
+  pasarela** (no confía en los parámetros del navegador) y liquida. Es idempotente: recargar no cobra dos veces. Si
+  rechaza, el cliente puede elegir otro método.
+- **Revertir:** crear el pago recién al volver de la pasarela (como hace el plugin de Mollie).
+
+### 2026-11-19 — Adaptador real + simulado; Tilopay se confirma con `consult`
+- **Decisión:** por defecto, PayPal y Tilopay usan una pasarela simulada (página `/pagos-simulados` del backend con
+  enlaces firmados con HMAC). Con `SPORA_PAGOS_REALES=paypal,tilopay` se usan las reales con las credenciales de cada
+  tienda: PayPal Orders v2 (crear orden → aprobar → capturar a la vuelta) y Tilopay (`processPayment` → página alojada →
+  `consult` a la vuelta). Tilopay no publica el algoritmo de `OrderHash`, así que no se usa; su propia documentación
+  recomienda `consult`.
+- **Pendiente:** webhooks de las pasarelas (el de compras de Tilopay solo se entrega por soporte) y probar ambas
+  reales con credenciales de prueba.
+- **Revertir:** no aplica.
+
+### 2026-11-19 — La moneda del cobro la impone el método
+- **Decisión:** SINPE cobra en CRC, PayPal en USD, la transferencia en la moneda de la cuenta del comercio, y Tilopay
+  y contra entrega en la del pedido. Se convierte con el tipo de cambio guardado en el pedido. El pago de Vendure queda
+  en la moneda del pedido; lo que de verdad se cobra va en `metadata.cobro` (monto, moneda, tasa), que es lo que usarán
+  las comisiones (PLAN §5: "la moneda en que entró el dinero").
+- **Revertir:** no aplica.
+
+### 2026-11-19 — Credenciales cifradas con AES-256-GCM
+- **Decisión:** un subscriber de TypeORM cifra los argumentos de los métodos de Spora al guardar y los descifra al
+  leer: en la base solo hay `enc:v1:…`, y el Admin UI (el propio comercio) los ve en claro. La clave sale de
+  `SPORA_ENCRYPTION_KEY` (obligatoria en producción).
+- **Revertir:** no aplica (regla de CLAUDE.md). Cambiar la clave exige volver a cifrar.
+
+### 2026-11-19 — Comprobante: archivo del pedido, la tienda liquida a mano
+- **Decisión:** el cliente sube el comprobante (imagen o PDF, ≤ 5 MB) desde la confirmación. Queda como asset en el
+  campo "Comprobante de pago" del pedido; el comercio lo revisa en el Admin UI y liquida el pago con el botón de Vendure.
+- **Revertir:** guardarlo en los metadatos del pago.

@@ -23,6 +23,12 @@ export interface Customer {
   addresses: Address[];
 }
 
+/** Lo que el cliente hace después de elegir cómo pagar (lo define cada proveedor de pago en el backend). */
+export type NextStep =
+  | { paso: "listo"; titulo: string; lineas: string[] }
+  | { paso: "instrucciones"; titulo: string; lineas: string[]; comprobante: true }
+  | { paso: "redirigir"; titulo: string; url: string };
+
 export interface CartLine {
   id: string;
   quantity: number;
@@ -51,7 +57,9 @@ export interface Cart {
   customer: { email: string; firstName: string; lastName: string } | null;
   shippingAddress: Address | null;
   shippingMethod: { id: string; name: string } | null;
-  payments: { method: string; state: string; amount: Money }[];
+  payments: { method: string; state: string; amount: Money; next: NextStep | null }[];
+  /** Comprobante de pago subido por el cliente (SINPE o transferencia). */
+  receipt: string | null;
 }
 
 export interface ShippingOption {

@@ -22,7 +22,7 @@ import {
 } from "@vendure/core";
 import { type CurrencyCode as SporaCurrency } from "@spora/shared";
 import { type DesignStyle } from "@spora/themes";
-import { cashOnDeliveryHandler } from "../payments/cash-on-delivery";
+import { cashOnDeliveryHandler } from "../payments/handlers";
 
 export type SellerStatus = "pendiente" | "activo" | "suspendido";
 export const sellerStatuses: SellerStatus[] = ["pendiente", "activo", "suspendido"];
@@ -160,15 +160,34 @@ export class StoreService {
     }
     await this.shippingMethods.assignShippingMethodsToChannel(ctx, { shippingMethodIds, channelId });
 
-    const cod = await this.paymentMethods.create(ctx, {
-      code: `${slug}-contra-entrega`,
-      enabled: true,
-      handler: { code: cashOnDeliveryHandler.code, arguments: [] },
-      translations: [
-        { languageCode: LanguageCode.es, name: "Contra entrega", description: "Pague en efectivo o SINPE al recibir." },
-      ],
+    await this.addPaymentMethod(ctx, channelId, slug, {
+      handler: cashOnDeliveryHandler.code,
+      name: "Contra entrega",
+      description: "Pague en efectivo o SINPE al recibir.",
     });
-    await this.paymentMethods.assignPaymentMethodsToChannel(ctx, { paymentMethodIds: [cod.id], channelId });
+  }
+
+  /**
+   * Activa un proveedor de pago en una tienda (código `<tienda>-<proveedor>`). Las credenciales van en `args` y se
+   * guardan cifradas (PaymentMethodSecrets).
+   */
+  async addPaymentMethod(
+    ctx: RequestContext,
+    channelId: ID,
+    slug: string,
+    method: { handler: string; name: string; description: string; args?: Record<string, string> },
+  ) {
+    const created = await this.paymentMethods.create(ctx, {
+      code: `${slug}-${method.handler}`,
+      enabled: true,
+      handler: {
+        code: method.handler,
+        arguments: Object.entries(method.args ?? {}).map(([name, value]) => ({ name, value })),
+      },
+      translations: [{ languageCode: LanguageCode.es, name: method.name, description: method.description }],
+    });
+    await this.paymentMethods.assignPaymentMethodsToChannel(ctx, { paymentMethodIds: [created.id], channelId });
+    return created;
   }
 
   /** Estado del comercio dueño del canal con este token; `null` para el canal del marketplace o un token desconocido. */

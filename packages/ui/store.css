@@ -562,3 +562,22 @@ a {
   font-weight: 700;
   color: var(--sp-color-fg);
 }
+
+/* Pago en la confirmación: instrucciones y comprobante */
+.payment {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: var(--sp-space);
+}
+.payment p {
+  margin: 0;
+}
+.payment__title {
+  font-weight: 600;
+}
+.payment__receipt {
+  color: var(--sp-color-ok);
+}
+.payment__upload {
+  margin-top: 0.5rem;
+}

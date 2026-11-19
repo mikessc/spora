@@ -189,7 +189,47 @@ function PaymentPage({
   ]);
 }
 
-function OrderPage(order: Cart) {
+/** Lo que sigue según el proveedor de pago: instrucciones (y comprobante) o nada. Igual para cualquier proveedor. */
+function PaymentBlock(order: Cart, notice?: string) {
+  return section("checkout__block", [
+    h2("Pago"),
+    notice ? p({ class: "form__error", role: "alert" }, notice) : null,
+    ...order.payments
+      .filter((pay) => pay.state !== "Declined" && pay.state !== "Cancelled")
+      .map((pay) =>
+        div("payment", [
+          p("payment__title", `${pay.next?.titulo ?? pay.method}: ${formatMoney(pay.amount)}`),
+          ...(pay.next && "lineas" in pay.next ? pay.next.lineas.map((line) => p("payment__line", line)) : []),
+          pay.next?.paso === "instrucciones" && pay.state === "Authorized"
+            ? order.receipt
+              ? p("payment__receipt", "Comprobante recibido: la tienda confirmará el pago.")
+              : form(
+                  {
+                    class: "form payment__upload",
+                    method: "post",
+                    action: `/pedido/${order.code}/comprobante`,
+                    enctype: "multipart/form-data",
+                  },
+                  [
+                    label({ for: "comprobante" }, "Comprobante (imagen o PDF, hasta 5 MB)"),
+                    input({
+                      id: "comprobante",
+                      type: "file",
+                      name: "comprobante",
+                      required: true,
+                      accept: "image/*,application/pdf",
+                    }),
+                    button({ class: "form__submit", type: "submit" }, "Enviar comprobante"),
+                  ],
+                )
+            : null,
+        ]),
+      ),
+    order.exchangeRate ? p("order__rate", `Tipo de cambio del pedido: ₡${order.exchangeRate} por dólar.`) : null,
+  ]);
+}
+
+function OrderPage(order: Cart, notice?: string) {
   const addr = order.shippingAddress;
   return main("checkout", [
     h1("checkout__title", "¡Gracias por su compra!"),
@@ -208,13 +248,7 @@ function OrderPage(order: Cart) {
           order.shippingMethod ? p(order.shippingMethod.name) : null,
         ])
       : null,
-    section("checkout__block", [
-      h2("Pago"),
-      ...order.payments.map((pay) =>
-        p(`${pay.method === "contra-entrega" ? "Contra entrega" : pay.method}: ${formatMoney(pay.amount)}`),
-      ),
-      order.exchangeRate ? p("order__rate", `Tipo de cambio del pedido: ₡${order.exchangeRate} por dólar.`) : null,
-    ]),
+    PaymentBlock(order, notice),
     Summary(order, order.exchangeRate),
     p([a({ href: "/" }, "Seguir comprando"), " · ", a({ href: "/cuenta" }, "Mis pedidos")]),
   ]);
@@ -331,7 +365,14 @@ export function registerCheckoutRoutes(app: Hono<Env>, render: Render) {
       };
     });
 
-  app.get("/checkout/pago", (c) => paymentPage(c));
+  app.get("/checkout/pago", (c) =>
+    paymentPage(
+      c,
+      c.req.query("aviso") === "rechazado"
+        ? "El pago no se completó. Intente de nuevo o elija otro método."
+        : undefined,
+    ),
+  );
 
   app.post("/checkout/pago", async (c) => {
     const method = field(await c.req.formData(), "pago");
@@ -340,7 +381,12 @@ export function registerCheckoutRoutes(app: Hono<Env>, render: Render) {
       return paymentPage(c, "Elija cómo pagar.");
     }
     try {
-      const order = await shop.pay(method);
+      const code = (await shop.activeOrder())?.code ?? "";
+      const origin = new URL(c.req.url).origin;
+      const order = await shop.pay(method, { returnUrl: `${origin}/pago/retorno?pedido=${code}` });
+      // Pasarela (PayPal, Tilopay): el cliente sigue allá y vuelve a /pago/retorno. Si no, ya está confirmado.
+      const next = order.payments.at(-1)?.next;
+      if (order.state === "ArrangingPayment" && next?.paso === "redirigir") return c.redirect(next.url, 303);
       return c.redirect(`/pedido/${order.code}`, 303);
     } catch {
       return paymentPage(c, "No se pudo confirmar el pago. Intente de nuevo.");
@@ -357,7 +403,38 @@ export function registerCheckoutRoutes(app: Hono<Env>, render: Render) {
           status: 404,
         };
       }
-      return { content: () => OrderPage(order), meta: meta(`Pedido ${order.code} · ${store.name}`) };
+      const notice =
+        c.req.query("aviso") === "comprobante"
+          ? "No se pudo subir el comprobante: use una imagen o un PDF de hasta 5 MB."
+          : undefined;
+      return { content: () => OrderPage(order, notice), meta: meta(`Pedido ${order.code} · ${store.name}`) };
     }),
   );
+
+  // Vuelta de la pasarela: el backend confirma con ella (no se confía en los parámetros) y liquida el pago.
+  app.get("/pago/retorno", async (c) => {
+    const { pedido = "", ...params } = c.req.query();
+    try {
+      const order = await c.get("shop").completeExternalPayment(pedido, params);
+      if (order.state === "PaymentSettled" || order.state === "PaymentAuthorized") {
+        return c.redirect(`/pedido/${order.code}`, 303);
+      }
+    } catch {
+      // Cae al aviso: el cliente puede reintentar.
+    }
+    return c.redirect("/checkout/pago?aviso=rechazado", 303);
+  });
+
+  app.post("/pedido/:code/comprobante", async (c) => {
+    const code = c.req.param("code");
+    const file = (await c.req.parseBody()).comprobante;
+    try {
+      if (!(file instanceof File) || !file.size) throw new Error("sin archivo");
+      const base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
+      await c.get("shop").submitReceipt(code, { name: file.name, type: file.type, base64 });
+      return c.redirect(`/pedido/${code}`, 303);
+    } catch {
+      return c.redirect(`/pedido/${code}?aviso=comprobante`, 303);
+    }
+  });
 }

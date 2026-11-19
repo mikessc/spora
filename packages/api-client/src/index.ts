@@ -568,6 +568,28 @@ export function createShopClient({ url, channelToken, cookie, onSetCookie }: Sho
         throw err;
       }
     },
+
+    // ── Pagos (M4) ────────────────────────────────────────────────────────────────────────────────────────────────
+    /** Vuelta de una pasarela (PayPal, Tilopay): el backend confirma con ella y liquida. Se puede repetir. */
+    async completeExternalPayment(orderCode: string, params: Record<string, string>): Promise<Cart> {
+      const { completeExternalPayment } = await request<{ completeExternalPayment: RawOrder }>(
+        `mutation Complete($code: String!, $params: JSON!) {
+          completeExternalPayment(orderCode: $code, params: $params) { ${ORDER} }
+        }`,
+        { code: orderCode, params },
+      );
+      return toCart(completeExternalPayment);
+    },
+
+    /** Comprobante de SINPE Móvil o transferencia (imagen o PDF de hasta 5 MB). */
+    async submitReceipt(orderCode: string, file: { name: string; type: string; base64: string }): Promise<void> {
+      await request(
+        `mutation Receipt($code: String!, $input: PaymentReceiptInput!) {
+          submitPaymentReceipt(orderCode: $code, input: $input)
+        }`,
+        { code: orderCode, input: file },
+      );
+    },
   };
 }
 

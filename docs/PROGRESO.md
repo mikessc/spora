@@ -17,6 +17,32 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
   workaround en los componentes. Reporte para upstream en
   [reportes/sibujs-checked-ssr.md](reportes/sibujs-checked-ssr.md).
 
+## 2026-11-19 — M4: pagos ✔
+- Hecho:
+  - **Interfaz común**: cada proveedor es un handler de pago de Vendure y le dice al storefront qué sigue (listo,
+    instrucciones + comprobante, o ir a la pasarela). El checkout no conoce proveedores: uno nuevo es un handler más.
+  - **Proveedores**: contra entrega; **SINPE Móvil** y **transferencia** (instrucciones con monto y datos de la
+    cuenta, el cliente sube el comprobante y la tienda liquida el pago en el Admin UI); **PayPal** y **Tilopay**
+    (redirección a la pasarela; a la vuelta el backend confirma con ella, idempotente).
+  - **Adaptador real + simulado**: por defecto, PayPal y Tilopay usan una pasarela simulada (aprobar o rechazar, con
+    enlaces firmados). Con `SPORA_PAGOS_REALES=paypal,tilopay` se usan las APIs reales (PayPal Orders v2; Tilopay
+    `processPayment` + `consult`) con las credenciales de cada tienda.
+  - **Cada tienda activa los suyos** en el Admin UI. Sus datos (número SINPE, IBAN, llaves) se guardan **cifrados**
+    (AES-256-GCM).
+  - **La moneda del cobro la impone el método**: SINPE → CRC, PayPal → USD, transferencia → la de la cuenta. Se
+    convierte con el tipo de cambio del pedido y el cobro real queda en el pago (para las comisiones de M6).
+  - Seed: Tienda Demo con SINPE, transferencia, PayPal y Tilopay; Café Sur con transferencia en USD, PayPal y Tilopay.
+- Tests: en Vendure, credenciales cifradas en la base y en claro para el Admin, SINPE en tienda USD cobrado en colones,
+  PayPal (URL de retorno ajena rechazada, retorno falso rechazado, retorno firmado liquida una sola vez) y el parser
+  del BCCR. `pnpm e2e` (18 recorridos) suma: SINPE sin JS con comprobante, PayPal simulado (pedido en colones cobrado
+  en dólares) y Tilopay rechazado con firma falsa, y luego completado con contra entrega.
+- Cómo probarlo: [LOCAL.md](LOCAL.md).
+- Pendiente:
+  - Webhooks de PayPal y Tilopay (el de compras de Tilopay solo lo da su soporte) y una prueba con credenciales de
+    sandbox reales.
+  - Avisar al cliente por correo cuando la tienda confirma un SINPE o una transferencia (fuera del MVP: no hay correos).
+- Sigue: **M5**, envíos.
+
 ## 2026-11-19 — M3: Cuenta Spora y checkout ✔
 - Hecho:
   - **Cuenta Spora única**: registro, ingreso y salida desde cualquier tienda; la sesión se comparte entre

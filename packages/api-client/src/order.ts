@@ -1,5 +1,5 @@
 // Pedido, cuenta y checkout: consultas GraphQL y su traducción a los tipos de @spora/shared.
-import type { Address, Cart, CurrencyCode, Customer, Money, OrderSummary } from "@spora/shared";
+import type { Address, Cart, CurrencyCode, Customer, Money, NextStep, OrderSummary } from "@spora/shared";
 
 const ADDRESS = /* GraphQL */ `
   fullName
@@ -25,6 +25,9 @@ export const ORDER = /* GraphQL */ `
   currencyCode
   customFields {
     exchangeRate
+    paymentReceipt {
+      preview
+    }
   }
   customer {
     emailAddress
@@ -39,9 +42,11 @@ export const ORDER = /* GraphQL */ `
     }
   }
   payments {
+    id
     method
     state
     amount
+    metadata
   }
   lines {
     id
@@ -90,11 +95,11 @@ export interface RawOrder {
   shippingWithTax: number;
   totalWithTax: number;
   currencyCode: CurrencyCode;
-  customFields: { exchangeRate: string | null } | null;
+  customFields: { exchangeRate: string | null; paymentReceipt: { preview: string } | null } | null;
   customer: { emailAddress: string; firstName: string; lastName: string } | null;
   shippingAddress: RawAddress | null;
   shippingLines: { shippingMethod: { id: string; name: string } }[];
-  payments: { method: string; state: string; amount: number }[] | null;
+  payments: { method: string; state: string; amount: number; metadata: { public?: NextStep } | null }[] | null;
   lines: {
     id: string;
     quantity: number;
@@ -151,7 +156,14 @@ export const toCart = (o: RawOrder): Cart => {
       : null,
     shippingAddress: toAddress(o.shippingAddress),
     shippingMethod: o.shippingLines[0]?.shippingMethod ?? null,
-    payments: (o.payments ?? []).map((p) => ({ method: p.method, state: p.state, amount: money(p.amount) })),
+    payments: (o.payments ?? []).map((p) => ({
+      method: p.method,
+      state: p.state,
+      amount: money(p.amount),
+      // La Shop API expone solo `metadata.public` de cada pago: ahí va el siguiente paso.
+      next: p.metadata?.public?.paso ? p.metadata.public : null,
+    })),
+    receipt: o.customFields?.paymentReceipt?.preview ?? null,
     lines: o.lines.map((l) => ({
       id: l.id,
       quantity: l.quantity,

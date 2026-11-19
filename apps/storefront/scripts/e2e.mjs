@@ -243,7 +243,11 @@ try {
   ok("Cuenta Spora: registro en Tienda Demo y la misma sesión en Café Sur (cookie compartida entre subdominios)");
 
   // Compra con cuenta en Café Sur (USD): dirección del nomenclátor, envío a domicilio y contra entrega.
-  const checkout = async (page, origin, { shipping, address, contact }) => {
+  const checkout = async (
+    page,
+    origin,
+    { shipping, address, contact, payment = "Contra entrega", expectOrder = true },
+  ) => {
     await page.goto(`${origin}/carrito`);
     await page.click(".cart__checkout");
     await page.waitForURL(`${origin}/checkout/datos`);
@@ -262,8 +266,9 @@ try {
     await page.locator(".checkout__choice", { hasText: shipping }).locator("input").check();
     await page.click(".form__submit");
     await page.waitForURL(`${origin}/checkout/pago`);
-    await page.locator(".checkout__choice", { hasText: "Contra entrega" }).locator("input").check();
+    await page.locator(".checkout__choice", { hasText: payment }).locator("input").check();
     await page.click(".form__submit");
+    if (!expectOrder) return null;
     await page.waitForURL(new RegExp(`${origin}/pedido/[A-Z0-9]+`));
     return text(page.locator(".order__code"));
   };
@@ -323,6 +328,84 @@ try {
   ok(
     "cuenta: dirección guardada, pedidos de Tienda Demo y Café Sur en un solo historial, y salir cierra la sesión en ambas",
   );
+  // ── M4: pagos ──────────────────────────────────────────────────────────────────────────────────────────────────
+  const buy = async (page, origin, slug) => {
+    await page.goto(`${origin}/producto/${slug}`);
+    await page.locator(".add-to-cart__button").click();
+    // Sin JS el formulario lleva al carrito; con JS la isla agrega sin navegar.
+    // La promesa que pierde la carrera vence a los 30 s: se le pone catch para que no tumbe el proceso.
+    const quiet = (promise) => promise.then(() => true).catch(() => false);
+    const done = await Promise.race([
+      quiet(page.waitForURL(`${origin}/carrito`)),
+      quiet(page.locator(".add-to-cart__status", { hasText: "Agregado" }).waitFor()),
+    ]);
+    assert.ok(done, "no se agregó al carrito");
+  };
+  const guestData = (name) => ({
+    contact: {
+      nombre: name,
+      apellidos: "Prueba",
+      correo: `${name.toLowerCase()}.${Date.now()}@correo.cr`,
+      telefono: "8777-0000",
+    },
+    address: { name: `${name} Prueba`, district: "40101" },
+    shipping: "Retiro en local",
+  });
+
+  // SINPE Móvil sin JS: instrucciones con número y monto en colones, y el comprobante se sube desde la confirmación.
+  const sinpe = await browser.newContext({ javaScriptEnabled: false, viewport });
+  const ps = await sinpe.newPage();
+  await buy(ps, STORE, "gorra-sibu");
+  const sinpeOrder = await checkout(ps, STORE, { ...guestData("Sara"), payment: "SINPE Móvil" });
+  assert.match(
+    await text(ps.locator(".payment")),
+    /Haga un SINPE Móvil por ₡6 500 al 8888-0000 \(Tienda Demo S\.A\.\)/,
+  );
+  await ps.setInputFiles("#comprobante", {
+    name: "comprobante.png",
+    mimeType: "image/png",
+    // PNG de 1×1.
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+  });
+  await ps.locator(".payment__upload .form__submit").click();
+  await ps.waitForURL(`${STORE}/pedido/${sinpeOrder}`);
+  assert.match(await text(ps.locator(".payment__receipt")), /Comprobante recibido/);
+  await sinpe.close();
+  ok(`SINPE sin JS: pedido ${sinpeOrder}, instrucciones con número y monto, comprobante subido`);
+
+  // PayPal (simulado): pedido en colones, cobro en dólares; aprobar en la pasarela liquida el pago.
+  const gw = await browser.newContext({ viewport });
+  const pp = await gw.newPage();
+  await buy(pp, STORE, "camiseta-volcan");
+  await checkout(pp, STORE, { ...guestData("Pablo"), payment: "PayPal", expectOrder: false });
+  await pp.waitForURL(/localhost:3000\/pagos-simulados/);
+  assert.match(await text(pp.locator("body")), /PayPal \(simulado\).*\$27,18/);
+  await pp.click(".aprobar");
+  await pp.waitForURL(new RegExp(`${STORE}/pedido/[A-Z0-9]+`));
+  assert.match(await text(pp.locator(".checkout__who")), /Pagado/);
+  assert.match(await text(pp.locator(".payment__title")), /PayPal/);
+  ok("PayPal simulado: pedido de ₡14 000 cobrado en dólares ($27,18), aprobado y pagado");
+
+  // Tilopay (simulado) rechazado → vuelve al pago con aviso; un retorno falsificado tampoco pasa; luego contra entrega.
+  await buy(pp, STORE, "gorra-sibu");
+  await checkout(pp, STORE, { ...guestData("Tina"), payment: "Tarjeta", expectOrder: false });
+  await pp.waitForURL(/pagos-simulados/);
+  const approveUrl = new URL((await pp.locator(".aprobar").getAttribute("href")) ?? "");
+  await pp.click(".rechazar");
+  await pp.waitForURL(`${STORE}/checkout/pago?aviso=rechazado`);
+  assert.match(await text(pp.locator(".form__error")), /no se completó/);
+  approveUrl.searchParams.set("firma", "0".repeat(64));
+  await pp.goto(approveUrl.toString());
+  await pp.waitForURL(`${STORE}/checkout/pago?aviso=rechazado`);
+  await pp.locator(".checkout__choice", { hasText: "Contra entrega" }).locator("input").check();
+  await pp.click(".form__submit");
+  await pp.waitForURL(new RegExp(`${STORE}/pedido/[A-Z0-9]+`));
+  assert.match(await text(pp.locator(".checkout__who")), /Confirmado/);
+  await gw.close();
+  ok("Tilopay simulado: rechazo vuelve al pago, retorno con firma falsa rechazado, y se completa con contra entrega");
 } finally {
   await browser.close();
   console.log(results.join("\n"));

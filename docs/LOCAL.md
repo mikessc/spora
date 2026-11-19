@@ -51,6 +51,13 @@ curl sin configurar nada.
 - **Cambiar el esquema** (entidades o custom fields): `pnpm --filter @spora/backend migration:generate <nombre>` y
   commitear la migración de `apps/backend/src/migrations`.
 
+## Pagos
+- Contra entrega, SINPE Móvil y transferencia funcionan sin nada más. Con SINPE o transferencia el cliente sube el
+  comprobante en la confirmación; la tienda lo ve en el Admin UI (pedido → "Comprobante de pago") y liquida el pago.
+- PayPal y Tilopay usan una pasarela simulada (`http://localhost:3000/pagos-simulados`): "Aprobar" o "Rechazar". Para
+  las reales: `SPORA_PAGOS_REALES=paypal,tilopay` en `apps/backend/.env` y las credenciales en el método de pago de la
+  tienda (Admin UI → Configuración → Métodos de pago).
+
 ## Tipo de cambio
 Sin credenciales del BCCR se usa la tasa fija `BCCR_SIMULATED_RATE` (₡515,00 por defecto). Para la real, poner
 `BCCR_EMAIL` y `BCCR_TOKEN` en `apps/backend/.env` (suscripción gratuita del BCCR).

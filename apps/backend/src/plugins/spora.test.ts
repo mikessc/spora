@@ -1,7 +1,7 @@
 // Reglas de M1 contra un Vendure real (sql.js en memoria): alta de comercio, estados y catálogo.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { LanguageCode, mergeConfig } from "@vendure/core";
+import { LanguageCode, mergeConfig, TransactionalConnection } from "@vendure/core";
 import { businessDate } from "@spora/shared";
 import { createTestEnvironment, registerInitializer, SqljsInitializer, testConfig } from "@vendure/testing";
 import gql from "graphql-tag";
@@ -10,7 +10,8 @@ import { after, before, describe, test } from "node:test";
 import { AccountPlugin } from "./account/account.plugin";
 import { CatalogPlugin } from "./catalog/catalog.plugin";
 import { CurrencyPlugin } from "./currency/currency.plugin";
-import { cashOnDeliveryHandler } from "./payments/cash-on-delivery";
+import { sign } from "./payments/gateways";
+import { PaymentsPlugin } from "./payments/payments.plugin";
 import { SellersPlugin } from "./sellers/sellers.plugin";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
@@ -18,8 +19,8 @@ registerInitializer("sqljs", new SqljsInitializer(path.join(dir, "../../__data__
 
 process.env.BCCR_SIMULATED_RATE = "515.25";
 const config = mergeConfig(testConfig, {
-  plugins: [SellersPlugin, CatalogPlugin, CurrencyPlugin, AccountPlugin],
-  paymentOptions: { paymentMethodHandlers: [cashOnDeliveryHandler] },
+  plugins: [SellersPlugin, CatalogPlugin, CurrencyPlugin, AccountPlugin, PaymentsPlugin],
+  paymentOptions: { paymentMethodHandlers: [] },
   authOptions: { requireVerification: false },
 });
 const { server, adminClient, shopClient } = createTestEnvironment(config);
@@ -537,5 +538,169 @@ describe("cuenta y checkout (M3)", () => {
         state: "PaymentAuthorized",
       },
     ]);
+  });
+});
+
+describe("pagos (M4)", () => {
+  const DEFAULT_TOKEN = testConfig.defaultChannelToken ?? "e2e-default-channel";
+  const ORDER = `code state totalWithTax payments { id state method metadata }`;
+  const RESULT = `__typename ... on Order { ${ORDER} } ... on ErrorResult { errorCode message }`;
+  const returnUrl = "http://cafe-sur.spora.localhost:4000/pago/retorno?pedido=X";
+
+  const createMethod = (handler: string, args: Record<string, string>) =>
+    adminClient.query(
+      gql`
+        mutation ($input: CreatePaymentMethodInput!) {
+          createPaymentMethod(input: $input) {
+            id
+            handler {
+              args {
+                name
+                value
+              }
+            }
+          }
+        }
+      `,
+      {
+        input: {
+          code: `cafe-sur-${handler}`,
+          enabled: true,
+          handler: { code: handler, arguments: Object.entries(args).map(([name, value]) => ({ name, value })) },
+          translations: [{ languageCode: "es", name: handler }],
+        },
+      },
+    );
+
+  /** Un pedido de Café Sur (USD) listo para pagar: 1 × $10 + $5 de envío. */
+  async function orderReadyToPay() {
+    shopClient.setChannelToken("cafe-sur");
+    const { product } = await shopClient.query(gql`
+      query {
+        product(slug: "cafe-500") {
+          variants {
+            id
+          }
+        }
+      }
+    `);
+    await shopClient.query(
+      gql`mutation ($id: ID!) { addItemToOrder(productVariantId: $id, quantity: 1) { ${RESULT} } }`,
+      { id: product.variants[0].id },
+    );
+    await shopClient.query(
+      gql`mutation ($input: CreateAddressInput!) { setOrderShippingAddress(input: $input) { ${RESULT} } }`,
+      {
+        input: {
+          fullName: "Rosa Vargas",
+          streetLine1: "Frente a la plaza",
+          city: "Escazú",
+          province: "San José",
+          postalCode: "10201",
+          countryCode: "CR",
+        },
+      },
+    );
+    const { eligibleShippingMethods } = await shopClient.query(gql`
+      query {
+        eligibleShippingMethods {
+          id
+          name
+        }
+      }
+    `);
+    const delivery = eligibleShippingMethods.find((m: { name: string }) => m.name === "Envío a domicilio");
+    await shopClient.query(
+      gql`mutation ($id: [ID!]!) { setOrderShippingMethod(shippingMethodId: $id) { ${RESULT} } }`,
+      {
+        id: [delivery.id],
+      },
+    );
+    await shopClient.query(gql`mutation { transitionOrderToState(state: "ArrangingPayment") { ${RESULT} } }`);
+  }
+
+  const pay = async (method: string, metadata: Record<string, string> = {}) =>
+    (
+      await shopClient.query(gql`mutation ($input: PaymentInput!) { addPaymentToOrder(input: $input) { ${RESULT} } }`, {
+        input: { method, metadata },
+      })
+    ).addPaymentToOrder;
+
+  const complete = async (code: string, params: Record<string, string>) =>
+    (
+      await shopClient.query(
+        gql`mutation ($code: String!, $params: JSON!) { completeExternalPayment(orderCode: $code, params: $params) { ${ORDER} } }`,
+        { code, params },
+      )
+    ).completeExternalPayment;
+
+  before(async () => {
+    await adminClient.asSuperAdmin();
+    adminClient.setChannelToken("cafe-sur");
+    await createMethod("sinpe-movil", { telefono: "8999-1234", titular: "Café Sur" });
+    await createMethod("paypal", { clientId: "id", clientSecret: "secreto-paypal", entorno: "sandbox" });
+    adminClient.setChannelToken(DEFAULT_TOKEN);
+  });
+
+  test("las credenciales del comercio quedan cifradas en la base y en claro para el Admin", async () => {
+    const rows: { handler: string }[] = await server.app
+      .get(TransactionalConnection)
+      .rawConnection.query(
+        `select handler from payment_method where code in ('cafe-sur-sinpe-movil', 'cafe-sur-paypal')`,
+      );
+    const raw = rows.map((r) => r.handler).join(" ");
+    assert.ok(!raw.includes("8999-1234") && !raw.includes("secreto-paypal"), raw);
+    assert.match(raw, /enc:v1:/);
+    adminClient.setChannelToken("cafe-sur");
+    const { paymentMethods } = await adminClient.query(gql`
+      query {
+        paymentMethods {
+          items {
+            code
+            handler {
+              args {
+                name
+                value
+              }
+            }
+          }
+        }
+      }
+    `);
+    adminClient.setChannelToken(DEFAULT_TOKEN);
+    const sinpe = paymentMethods.items.find((m: { code: string }) => m.code === "cafe-sur-sinpe-movil");
+    assert.deepEqual(sinpe.handler.args[0], { name: "telefono", value: "8999-1234" });
+  });
+
+  test("SINPE en una tienda en USD cobra en colones con el tipo de cambio del pedido", async () => {
+    await orderReadyToPay();
+    const order = await pay("cafe-sur-sinpe-movil");
+    assert.equal(order.state, "PaymentAuthorized");
+    // $15 × ₡515,25 = ₡7 728,75
+    const lines = order.payments.at(-1).metadata.public.lineas.join(" ").replace(/\s/g, " ");
+    assert.match(lines, /₡7 728,75 al 8999-1234 \(Café Sur\)/);
+  });
+
+  test("PayPal: espera a la pasarela; un retorno falso rechaza y uno firmado liquida, una sola vez", async () => {
+    await orderReadyToPay();
+    await assert.rejects(pay("cafe-sur-paypal", { returnUrl: "https://evil.example/robar" }), /no permitida/);
+    const first = await pay("cafe-sur-paypal", { returnUrl });
+    assert.equal(first.state, "ArrangingPayment");
+    assert.equal(first.payments.at(-1).state, "EnPasarela");
+    const url = new URL(first.payments.at(-1).metadata.public.url);
+    assert.equal(url.searchParams.get("monto"), "$15");
+
+    const forged = await complete(first.code, { ref: url.searchParams.get("ref")!, estado: "aprobado", firma: "x" });
+    assert.equal(forged.state, "ArrangingPayment");
+    assert.equal(forged.payments.at(-1).state, "Declined");
+
+    const second = await pay("cafe-sur-paypal", { returnUrl });
+    const ref = new URL(second.payments.at(-1).metadata.public.url).searchParams.get("ref")!;
+    const approved = { ref, estado: "aprobado", firma: sign(`${ref}|aprobado`) };
+    const settled = await complete(second.code, approved);
+    assert.equal(settled.state, "PaymentSettled");
+    const again = await complete(second.code, approved);
+    assert.equal(again.state, "PaymentSettled");
+    assert.equal(again.payments.filter((p: { state: string }) => p.state === "Settled").length, 1);
   });
 });

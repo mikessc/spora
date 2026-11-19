@@ -6,7 +6,7 @@ import { DefaultJobQueuePlugin, DefaultSchedulerPlugin, type VendureConfig } fro
 import { AccountPlugin } from "./plugins/account/account.plugin";
 import { CatalogPlugin } from "./plugins/catalog/catalog.plugin";
 import { CurrencyPlugin } from "./plugins/currency/currency.plugin";
-import { cashOnDeliveryHandler } from "./plugins/payments/cash-on-delivery";
+import { PaymentsPlugin } from "./plugins/payments/payments.plugin";
 import { SellersPlugin } from "./plugins/sellers/sellers.plugin";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
@@ -50,7 +50,8 @@ export const config: VendureConfig = {
     synchronize: false,
     migrations: [path.join(dir, "migrations/*.{ts,js}")],
   },
-  paymentOptions: { paymentMethodHandlers: [cashOnDeliveryHandler] },
+  // Los proveedores de pago los registra PaymentsPlugin.
+  paymentOptions: { paymentMethodHandlers: [] },
   importExportOptions: { importAssetsDir: path.join(dir, "../seed/assets") },
   plugins: [
     AssetServerPlugin.init({
@@ -66,5 +67,6 @@ export const config: VendureConfig = {
     CatalogPlugin,
     CurrencyPlugin,
     AccountPlugin,
+    PaymentsPlugin,
   ],
 };

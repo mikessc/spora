@@ -59,7 +59,22 @@ interface StoreSeed {
   theme: Record<string, string>;
   /** [nombre, categoría global, slugs de productos] */
   collections: [string, string, string[]][];
+  /** Proveedores de pago además de contra entrega (credenciales de ejemplo; se guardan cifradas). */
+  payments: { handler: string; name: string; description: string; args?: Record<string, string> }[];
 }
+
+const paypal = {
+  handler: "paypal",
+  name: "PayPal",
+  description: "Se cobra en dólares al tipo de cambio del día.",
+  args: { clientId: "", clientSecret: "", entorno: "sandbox" },
+};
+const tilopay = {
+  handler: "tilopay",
+  name: "Tarjeta de crédito o débito",
+  description: "Pago seguro con Tilopay.",
+  args: { apiUser: "", password: "", key: "" },
+};
 
 const stores: StoreSeed[] = [
   {
@@ -82,6 +97,28 @@ const stores: StoreSeed[] = [
       ["Camisetas", "moda-hombre-camisetas", ["camiseta-sibu", "camiseta-volcan"]],
       ["Accesorios", "moda-accesorios", ["gorra-sibu"]],
     ],
+    payments: [
+      {
+        handler: "sinpe-movil",
+        name: "SINPE Móvil",
+        description: "Pague por SINPE Móvil y suba el comprobante.",
+        args: { telefono: "8888-0000", titular: "Tienda Demo S.A." },
+      },
+      {
+        handler: "transferencia",
+        name: "Transferencia bancaria",
+        description: "Transfiera a nuestra cuenta en colones y suba el comprobante.",
+        args: {
+          banco: "BAC Credomatic",
+          titular: "Tienda Demo S.A.",
+          cedula: "3-101-123456",
+          iban: "CR05015202001026284066",
+          moneda: "CRC",
+        },
+      },
+      paypal,
+      tilopay,
+    ],
   },
   {
     slug: "cafe-sur",
@@ -98,6 +135,22 @@ const stores: StoreSeed[] = [
       shippingPolicy: "Envíos a todo el país. Pedidos antes del mediodía salen el mismo día.",
     },
     collections: [["Café y chocolate", "cafe-y-alimentos", ["cafe-tarrazu", "chocolate-70"]]],
+    payments: [
+      {
+        handler: "transferencia",
+        name: "Transferencia en dólares",
+        description: "Transfiera a nuestra cuenta en dólares y suba el comprobante.",
+        args: {
+          banco: "Banco Nacional",
+          titular: "Café Sur Limitada",
+          cedula: "3-102-654321",
+          iban: "CR21015100010026012345",
+          moneda: "USD",
+        },
+      },
+      paypal,
+      tilopay,
+    ],
   },
 ];
 
@@ -174,6 +227,10 @@ async function seedStore(seed: StoreSeed, ctx: RequestContext, connection: Trans
       },
     }),
   );
+
+  for (const method of seed.payments) {
+    await app.get(StoreService).addPaymentMethod(ctx, store.id, seed.slug, method);
+  }
 
   const csv = path.join(dir, `../seed/tiendas/${seed.slug}.csv`);
   const result = await importProductsFromCsv(app, csv, LanguageCode.es, store);
