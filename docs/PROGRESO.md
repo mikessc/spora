@@ -35,6 +35,11 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
   - **Guía de prueba**: [PRUEBA-MVP.md](PRUEBA-MVP.md), paso a paso con usuarios, URLs y qué debe verse.
 - Bug encontrado por el seed y corregido: un paquete **devuelto** no cancelaba el pedido (Vendure exige cancelar las
   líneas: ahora usa `cancelOrder`, devuelve el stock y cancela la contra entrega que nunca se cobró). Test de regresión.
+- Probado el **clon limpio** (`docker compose up -d && pnpm install && pnpm seed && pnpm dev` y `pnpm e2e`). Encontró y
+  se corrigió:
+  - bajo turbo en Windows `tsx watch` no levantaba storefront ni marketplace (ahora `node --watch`);
+  - reindexar una tienda la sacaba unos instantes del marketplace (ahora reemplaza y después borra);
+  - sin `.env` la telemetría de Vendure quedaba encendida (ahora apagada por defecto).
 - Tests: `pnpm check` (31 tests de integración de Vendure). `pnpm e2e` (25 recorridos) suma compras en **las cuatro
   tiendas** con pagos y envíos distintos: Barro y Telar sin JS por Correos con SINPE; Voltio desde el marketplace con
   mensajería y tarjeta, entregado por webhook firmado y con su comisión del 5 % facturable en dólares.

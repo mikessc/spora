@@ -350,3 +350,11 @@ cómo revertirla.
   líneas vivas). Lo encontró el seed.
 - **Arreglo:** `cancelOrder` (cancela líneas y devuelve el stock) y se cancela el pago autorizado (contra entrega que no
   se cobró). Test de regresión en Vendure.
+
+### 2026-11-19 — Encontrado en el clon limpio
+- **`pnpm dev`:** bajo turbo en Windows, `tsx watch` no llegaba a levantar storefront ni marketplace. Se usa
+  `node --watch --import tsx` (watch nativo de Node). **Revertir:** volver a `tsx watch` si turbo lo arregla.
+- **Telemetría:** sin `.env`, Vendure mandaba telemetría anónima. `vendure-config.ts` pone
+  `VENDURE_DISABLE_TELEMETRY=true` si no está definida. **Revertir:** definirla en `false`.
+- **Índice:** reindexar una tienda borraba sus productos antes de volver a leerlos, y por un momento la tienda
+  desaparecía del marketplace. Ahora se reemplazan primero y después se borran solo los que ya no están.
