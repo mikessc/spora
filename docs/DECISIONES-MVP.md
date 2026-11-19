@@ -358,3 +358,52 @@ cómo revertirla.
   `VENDURE_DISABLE_TELEMETRY=true` si no está definida. **Revertir:** definirla en `false`.
 - **Índice:** reindexar una tienda borraba sus productos antes de volver a leerlos, y por un momento la tienda
   desaparecía del marketplace. Ahora se reemplazan primero y después se borran solo los que ya no están.
+
+## Correcciones post-MVP
+
+### 2026-11-19 — El comercio sin UpdateChannel: `updateStoreSettings`
+- **Duda:** con `UpdateChannel` el comercio podía cambiar el comercio dueño, el código, el token, las monedas o los
+  impuestos de su canal; sin él, ¿cómo edita su tema?
+- **Decisión:** permiso propio `UpdateStoreSettings` y mutation `updateStoreSettings`, que solo acepta tema (estilo,
+  color, tipografía, logo, frase, nombre), textos y políticas, contacto y credenciales de TrackingApp, siempre del canal
+  activo (el permiso se revisa en el canal del `vendure-token`). Se agregaron los textos y las políticas a la lista
+  pedida porque el comercio ya los editaba y no tocan nada de Spora. `ChannelService.update` exige `UpdateChannel`:
+  después de validar, el servicio guarda con un contexto de admin de Spora en ese mismo canal. Los roles de comercio
+  ya creados se actualizan al arrancar. Como el Admin UI guarda el canal entero, el comercio lo edita en
+  `/panel/tienda` (misma sesión, como el panel de comisiones).
+- **Revertir:** devolver `UpdateChannel` a `SELLER_PERMISSIONS` (no recomendado).
+
+### 2026-11-19 — El cliente es de una tienda recién al hacer su primer pedido
+- **Duda:** ¿al pasar a ArrangingPayment o al hacer el pedido?
+- **Decisión:** al hacer el pedido (transición ArrangingPayment → pago autorizado o pagado), dentro de la misma
+  transición: quien llega al pago y no paga no se comparte. No va en `OrderPlacedEvent` porque Vendure, al hacer el
+  pedido, guarda las direcciones del cliente nuevo y para eso ya tiene que estar en el canal.
+- **Lo que se encontró:** desde Vendure 3.7 el propio guard de autenticación asigna al cliente a cada canal que visita
+  (nuestro `CustomerChannelInterceptor` hacía lo mismo). Se apaga con `customerChannelAssignmentStrategy` y se quita el
+  interceptor. Registrarse o dar datos de invitado en una tienda tampoco deja al cliente en ella si no compra.
+- **Para que todo siga andando antes de comprar:** carrito con `SporaActiveOrderStrategy` (pone el cliente en el
+  pedido aunque no esté en el canal y recupera su carrito de esa tienda), saludo y datos con `sporaCustomer`, y
+  direcciones con `sporaCreateAddress`. La migración `clientes-solo-al-comprar` quita a los clientes de las tiendas
+  donde nunca hicieron un pedido (no se puede deshacer).
+- **Revertir:** quitar la estrategia de asignación (vuelve a asignar en cada visita).
+
+### 2026-11-19 — Comisión sobre el subtotal sin IVA
+- **Decisión:** base = `order.subTotal` (sin IVA ni envío). Los movimientos existentes no se recalculan: la migración
+  los marca `baseIncludesTax` y el estado de cuenta (pantalla, PDF y CSV) dice "sin IVA" y señala los anteriores.
+- **Revertir:** volver a `subTotalWithTax` en `CommissionService.onPlaced`.
+
+### 2026-11-19 — "¿Recibiste tu pedido?", disputas y cierre con días de gracia
+- **Dónde:** la respuesta del cliente (`reportOrderDelivery`, Shop API) vive en el plugin de envíos y entrega el
+  pedido con `ShipmentEventsService`, igual que el Admin UI y los webhooks. Idempotente por pedido. La disputa avisa a
+  comisiones con un evento (`DeliveryDisputeEvent`) para no acoplar los plugins.
+- **Qué pedidos preguntan:** enviados sin entregar, y los de retiro en local (método `<tienda>-retiro`) ya hechos. Un
+  retiro no tiene guía: al confirmarlo se le crea una manual. "Sí" también entrega un retiro pagado por SINPE cuyo
+  comprobante la tienda aún no revisó: el pago lo sigue liquidando la tienda.
+- **Textos:** "¿Recibiste tu pedido?", "Sí, lo recibí" y "No lo recibí" van como se pidieron (de tú); los avisos que
+  siguen usan usted, como el resto de la cuenta.
+- **Disputa:** el pedido queda con `customerDeliveryReport = no-recibido` y su movimiento `en_disputa`; el cliente ya
+  no puede cambiar la respuesta. Resolverla es manual por ahora (ver PROGRESO).
+- **Cierre:** los 7 días (`SPORA_DIAS_GRACIA_CIERRE`) se cuentan en días de negocio de Costa Rica, del día del
+  pedido al día en que se cierra. Solo entran pedidos hechos en el mes que se cierra o antes. Al cerrar se vuelve a
+  revisar el pedido (cancelado o en disputa) por si el evento todavía no llegó al movimiento.
+- **Revertir:** `SPORA_DIAS_GRACIA_CIERRE` muy alto equivale a no facturar sin entrega.

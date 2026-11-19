@@ -19,6 +19,36 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
   test canario en M3): con un
   workaround en los componentes. Reporte para upstream en
   [reportes/sibujs-checked-ssr.md](reportes/sibujs-checked-ssr.md).
+- **Verificar el correo al registrarse:** activar `requireVerification` cuando haya correos transaccionales (hoy está
+  apagado: cualquiera puede crear una cuenta con un correo ajeno). Ojo: al verificar, Vendure asigna al cliente al
+  canal donde verificó; quitarlo como al registrarse.
+- **Avisar al cliente para que confirme la entrega:** un correo con "¿Recibiste tu pedido?" y los dos enlaces, para que
+  los pedidos no dependan del cierre por días de gracia.
+
+## 2026-11-19 — Correcciones post-MVP ✔
+- Hecho:
+  - **Seguridad:** el comercio ya no tiene `UpdateChannel` (podía cambiar comercio dueño, código, token, monedas o
+    impuestos de su canal). Edita su tienda con `updateStoreSettings` (solo tema, textos, contacto y credenciales de
+    TrackingApp, del canal activo) en `/panel/tienda`. Los roles existentes se actualizan al arrancar.
+  - **Privacidad:** el cliente pasa a ser de una tienda (y el comercio ve sus datos) recién cuando hace su primer
+    pedido ahí. Vendure ≥ 3.7 lo asignaba en cada visita; se apagó. Carrito, saludo, direcciones y la sesión compartida
+    siguen funcionando en tiendas donde aún no compró. Una migración quitó las asignaciones sin pedido.
+  - **Comisión sin IVA:** la base es el subtotal sin IVA ni envío. Lo anterior no se recalcula; queda marcado y el
+    estado de cuenta (pantalla, PDF, CSV) dice "sin IVA".
+  - **Entregas sin confirmar:** "¿Recibiste tu pedido?" en la Cuenta Spora (sin JS); "Sí" entrega el pedido y la
+    comisión se vuelve facturable; "No" lo deja **en disputa** (no se factura; lista "Pedidos en disputa" en el panel).
+    Al cerrar el mes, lo pendiente con 7 días o más (`SPORA_DIAS_GRACIA_CIERRE`) se factura con la marca
+    "facturado al cierre sin confirmar entrega"; el comercio ve en su panel qué entra y desde cuándo.
+- Tests: `pnpm check` (42 tests de Vendure, más reglas de cierre con fechas fijas: pedido del 30 con cierre el 31,
+  pedido de hace 10 días, en disputa). Vendure: el comercio sin `updateChannel` ni otro canal, privacidad (visitar
+  con sesión no comparte; comprar sí), confirmación del cliente, otro cliente no puede, disputa no se factura, cierre.
+  `pnpm e2e` (27 recorridos) suma `/panel/tienda` y "¿Recibiste tu pedido?" sin JS con la disputa en el panel de Spora.
+- Cómo probarlo: [PRUEBA-MVP.md](PRUEBA-MVP.md) (pasos 3 y 6) y [LOCAL.md](LOCAL.md).
+- Pendiente:
+  - **Resolver disputas:** hoy el admin de Spora las ve, pero no hay una acción para cerrarlas (facturar o anular);
+    se hace a mano.
+  - En el Admin UI el comercio todavía ve el formulario del canal con "Guardar", que ahora responde "no autorizado":
+    ocultarlo con una extensión del Admin UI.
 
 ## 2026-11-19 — M7: datos de ejemplo, pruebas de punta a punta y guía ✔ — **MVP completo**
 - Hecho:
