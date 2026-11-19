@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "seed": "pnpm --filter @spora/backend seed",
+    "seed": "docker compose up -d --wait && pnpm --filter @spora/backend seed",
     "check": "prettier --check . && turbo run typecheck test && eslint .",
     "format": "prettier --write .",
     "e2e": "pnpm --filter @spora/storefront e2e",

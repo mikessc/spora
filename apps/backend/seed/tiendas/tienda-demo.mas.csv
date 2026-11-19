@@ -1,0 +1,22 @@
+name,slug,description,assets,facets,optionGroups,optionValues,sku,price,taxCategory,stockOnHand,trackInventory,variantAssets,variantFacets,product:marketplaceCategory,product:brand,variant:weightGrams
+Blusa Coral,blusa-coral,"<p>Blusa liviana de algodón, manga corta.</p>",blusa-coral.svg,,Talla,S,BLUSA-CORAL-S,16500,IVA,12,true,blusa-coral.svg,,moda-mujer-blusas,sibu,180
+,,,,,,M,BLUSA-CORAL-M,16500,IVA,12,true,blusa-coral.svg,,,,180
+,,,,,,L,BLUSA-CORAL-L,16500,IVA,0,true,blusa-coral.svg,,,,180
+Vestido Atardecer,vestido-atardecer,"<p>Vestido midi de lino con botones al frente.</p>",vestido-atardecer-azul.svg|vestido-atardecer-verde.svg,,Talla|Color,S|Azul,VESTIDO-ATAR-S-AZUL,28000,IVA,12,true,vestido-atardecer-azul.svg,,moda-mujer-vestidos,sibu,300
+,,,,,,S|Verde,VESTIDO-ATAR-S-VERDE,28000,IVA,12,true,vestido-atardecer-verde.svg,,,,300
+,,,,,,M|Azul,VESTIDO-ATAR-M-AZUL,28000,IVA,12,true,vestido-atardecer-azul.svg,,,,300
+,,,,,,M|Verde,VESTIDO-ATAR-M-VERDE,28000,IVA,12,true,vestido-atardecer-verde.svg,,,,300
+,,,,,,L|Azul,VESTIDO-ATAR-L-AZUL,28000,IVA,12,true,vestido-atardecer-azul.svg,,,,300
+,,,,,,L|Verde,VESTIDO-ATAR-L-VERDE,28000,IVA,0,true,vestido-atardecer-verde.svg,,,,300
+Pantalón Lino,pantalon-lino,"<p>Pantalón de lino con cintura elástica.</p>",pantalon-lino.svg,,Talla,M,PANTALON-LIN-M,24000,IVA,12,true,pantalon-lino.svg,,moda-hombre-pantalones,sibu,350
+,,,,,,L,PANTALON-LIN-L,24000,IVA,12,true,pantalon-lino.svg,,,,350
+,,,,,,XL,PANTALON-LIN-XL,24000,IVA,0,true,pantalon-lino.svg,,,,350
+Camiseta Ola,camiseta-ola,"<p>Camiseta con estampado de olas del Pacífico.</p>",camiseta-ola-blanco.svg|camiseta-ola-azul.svg,,Talla|Color,S|Blanco,CAMISETA-OLA-S-BLANCO,12500,IVA,12,true,camiseta-ola-blanco.svg,,moda-hombre-camisetas,sibu,200
+,,,,,,S|Azul,CAMISETA-OLA-S-AZUL,12500,IVA,12,true,camiseta-ola-azul.svg,,,,200
+,,,,,,M|Blanco,CAMISETA-OLA-M-BLANCO,12500,IVA,12,true,camiseta-ola-blanco.svg,,,,200
+,,,,,,M|Azul,CAMISETA-OLA-M-AZUL,12500,IVA,12,true,camiseta-ola-azul.svg,,,,200
+,,,,,,L|Blanco,CAMISETA-OLA-L-BLANCO,12500,IVA,12,true,camiseta-ola-blanco.svg,,,,200
+,,,,,,L|Azul,CAMISETA-OLA-L-AZUL,12500,IVA,0,true,camiseta-ola-azul.svg,,,,200
+Bolso de Yute,bolso-de-yute,"<p>Bolso de yute con forro de algodón.</p>",bolso-de-yute.svg,,,,BOLSO-DE-YUT,18000,IVA,12,true,bolso-de-yute.svg,,moda-accesorios,sibu,400
+Pañuelo Tucán,panuelo-tucan,"<p>Pañuelo de seda estampado con tucanes.</p>",panuelo-tucan-rojo.svg|panuelo-tucan-verde.svg,,Color,Rojo,PANUELO-TUCA-ROJO,7500,IVA,12,true,panuelo-tucan-rojo.svg,,moda-accesorios,sibu,50
+,,,,,,Verde,PANUELO-TUCA-VERDE,7500,IVA,12,true,panuelo-tucan-verde.svg,,,,50

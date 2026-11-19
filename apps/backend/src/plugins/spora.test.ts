@@ -800,7 +800,12 @@ describe("envíos (M5)", () => {
       }
     `);
 
-    // Un pedido con contra entrega, enviado por TrackingApp (simulado).
+    ({ orderId, fulfillment } = await placeCodOrder());
+    adminClient.setChannelToken(DEFAULT_TOKEN);
+  });
+
+  /** Un pedido de Café Sur con contra entrega, enviado por TrackingApp (simulado). El adminClient va en cafe-sur. */
+  const placeCodOrder = async () => {
     shopClient.setChannelToken("cafe-sur");
     const { product } = await shopClient.query(gql`
       query {
@@ -863,7 +868,6 @@ describe("envíos (M5)", () => {
       `,
       { code: order.code },
     );
-    orderId = orders.items[0].id;
     const { addFulfillmentToOrder } = await adminClient.query(
       gql`
         mutation ($input: FulfillOrderInput!) {
@@ -890,18 +894,9 @@ describe("envíos (M5)", () => {
         },
       },
     );
-    fulfillment = addFulfillmentToOrder;
-    adminClient.setChannelToken(DEFAULT_TOKEN);
-  });
-
-  test("webhook firmado: entrega el pedido y liquida la contra entrega; repetido no hace nada", async () => {
-    assert.ok(fulfillment.customFields.externalId, JSON.stringify(fulfillment));
-    const first = await postWebhook("cafe-sur", delivered(), "evento-1");
-    assert.equal(first.status, 200);
-    assert.equal(((await first.json()) as { result: string }).result, "aplicado");
-    const again = await postWebhook("cafe-sur", delivered(), "evento-1");
-    assert.equal(((await again.json()) as { result: string }).result, "repetido");
-
+    return { orderId: orders.items[0].id as string, fulfillment: addFulfillmentToOrder as typeof fulfillment };
+  };
+  const orderStatus = async (id: string) => {
     adminClient.setChannelToken("cafe-sur");
     const { order } = await adminClient.query(
       gql`
@@ -920,13 +915,41 @@ describe("envíos (M5)", () => {
           }
         }
       `,
-      { id: orderId },
+      { id },
     );
     adminClient.setChannelToken(DEFAULT_TOKEN);
-    assert.deepEqual(order, {
+    return order;
+  };
+
+  test("webhook firmado: entrega el pedido y liquida la contra entrega; repetido no hace nada", async () => {
+    assert.ok(fulfillment.customFields.externalId, JSON.stringify(fulfillment));
+    const first = await postWebhook("cafe-sur", delivered(), "evento-1");
+    assert.equal(first.status, 200);
+    assert.equal(((await first.json()) as { result: string }).result, "aplicado");
+    const again = await postWebhook("cafe-sur", delivered(), "evento-1");
+    assert.equal(((await again.json()) as { result: string }).result, "repetido");
+    assert.deepEqual(await orderStatus(orderId), {
       state: "Delivered",
       payments: [{ state: "Settled" }],
       fulfillments: [{ state: "Delivered", customFields: { trackingStatus: "Entregado" } }],
+    });
+  });
+
+  // Encontrado por el seed (M7): Vendure no cancela un pedido con líneas vivas; hay que usar cancelOrder.
+  test("devuelto tras salir: cancela el pedido, la guía y la contra entrega sin cobrar", async () => {
+    adminClient.setChannelToken("cafe-sur");
+    const returned = await placeCodOrder();
+    adminClient.setChannelToken(DEFAULT_TOKEN);
+    const pkg = { id: returned.fulfillment.customFields.externalId, trackingNumber: "x" };
+    const onTheWay = { id: "evento-4", type: "package.status_changed", data: { to: "en_transito", package: pkg } };
+    assert.equal((await postWebhook("cafe-sur", onTheWay, "evento-4")).status, 200);
+    const back = { id: "evento-5", type: "package.returned", data: { package: { ...pkg, status: "devuelto" } } };
+    const res = await postWebhook("cafe-sur", back, "evento-5");
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.deepEqual(await orderStatus(returned.orderId), {
+      state: "Cancelled",
+      payments: [{ state: "Cancelled" }],
+      fulfillments: [{ state: "Cancelled", customFields: { trackingStatus: "Devuelto" } }],
     });
   });
 

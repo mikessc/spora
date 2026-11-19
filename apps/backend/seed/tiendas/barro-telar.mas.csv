@@ -1,0 +1,17 @@
+name,slug,description,assets,facets,optionGroups,optionValues,sku,price,taxCategory,stockOnHand,trackInventory,variantAssets,variantFacets,product:marketplaceCategory,product:brand,variant:weightGrams
+Taza de Barro,taza-de-barro,"<p>Taza de barro hecha a mano en Guaitil.</p>",taza-de-barro-terracota.svg|taza-de-barro-negro.svg,,Color,Terracota,TAZA-DE-BARR-TERRACOTA,9500,IVA,12,true,taza-de-barro-terracota.svg,,artesania-ceramica,barro-y-telar,350
+,,,,,,Negro,TAZA-DE-BARR-NEGRO,9500,IVA,12,true,taza-de-barro-negro.svg,,,,350
+Plato Hondo,plato-hondo,"<p>Plato hondo de cerámica esmaltada.</p>",plato-hondo.svg,,,,PLATO-HONDO,12000,IVA,12,true,plato-hondo.svg,,artesania-ceramica,barro-y-telar,600
+Jarrón Chorotega,jarron-chorotega,"<p>Jarrón con diseños chorotegas pintados a mano.</p>",jarron-chorotega.svg,,Tamaño,Pequeño,JARRON-CHORO-PEQUENO,22000,IVA,12,true,jarron-chorotega.svg,,artesania-ceramica,barro-y-telar,900
+,,,,,,Grande,JARRON-CHORO-GRANDE,38000,IVA,12,true,jarron-chorotega.svg,,,,900
+Mantel Bordado,mantel-bordado,"<p>Mantel de algodón bordado a mano.</p>",mantel-bordado.svg,,Tamaño,4 puestos,MANTEL-BORDA-4-PUESTOS,26000,IVA,12,true,mantel-bordado.svg,,artesania-textiles,barro-y-telar,700
+,,,,,,6 puestos,MANTEL-BORDA-6-PUESTOS,32000,IVA,12,true,mantel-bordado.svg,,,,700
+Hamaca,hamaca,"<p>Hamaca de algodón tejida en telar.</p>",hamaca-natural.svg|hamaca-multicolor.svg,,Color,Natural,HAMACA-NATURAL,45000,IVA,12,true,hamaca-natural.svg,,artesania-textiles,barro-y-telar,1800
+,,,,,,Multicolor,HAMACA-MULTICOLOR,45000,IVA,12,true,hamaca-multicolor.svg,,,,1800
+Bolso Tejido,bolso-tejido,"<p>Bolso de mano tejido con fibras naturales.</p>",bolso-tejido-azul.svg|bolso-tejido-rojo.svg,,Color,Azul,BOLSO-TEJIDO-AZUL,19000,IVA,12,true,bolso-tejido-azul.svg,,artesania-textiles,barro-y-telar,300
+,,,,,,Rojo,BOLSO-TEJIDO-ROJO,19000,IVA,12,true,bolso-tejido-rojo.svg,,,,300
+Individuales,individuales,"<p>Juego de 4 individuales tejidos.</p>",individuales-natural.svg|individuales-gris.svg,,Color,Natural,INDIVIDUALES-NATURAL,15000,IVA,12,true,individuales-natural.svg,,artesania-textiles,barro-y-telar,400
+,,,,,,Gris,INDIVIDUALES-GRIS,15000,IVA,12,true,individuales-gris.svg,,,,400
+Máscara Boruca,mascara-boruca,"<p>Máscara boruca tallada en balsa y pintada a mano.</p>",mascara-boruca.svg,,,,MASCARA-BORU,55000,IVA,12,true,mascara-boruca.svg,,artesania,barro-y-telar,800
+Velas de Cera de Abeja,velas-de-cera-de-abeja,"<p>Juego de 3 velas de cera de abeja.</p>",velas-de-cera-de-abeja.svg,,,,VELAS-DE-CER,8500,IVA,12,true,velas-de-cera-de-abeja.svg,,artesania,barro-y-telar,450
+Cucharas de Madera,cucharas-de-madera,"<p>Juego de 3 cucharas de madera de guanacaste.</p>",cucharas-de-madera.svg,,,,CUCHARAS-DE-,11000,IVA,12,true,cucharas-de-madera.svg,,artesania,barro-y-telar,250

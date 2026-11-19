@@ -142,11 +142,11 @@ try {
 
   // Listado sin JS + hidratación sin cambios (islas de filtros y contador).
   await p1.goto(`${STORE}/`, { waitUntil: "load" });
-  assert.equal(await text(p1.locator(".listing__count")), "3 productos");
+  assert.equal(await text(p1.locator(".listing__count")), "9 productos");
   assert.match(await text(p1.locator(".store-hero")), /Ropa de algodón/);
   const homeShot = await p1.screenshot({ fullPage: true });
   const { page: p3, context: js3 } = await assertSeamlessHydration(`${STORE}/`, 2, homeShot);
-  ok("portada: 3 productos sin JS; hidratación de filtros y contador sin cambios visibles");
+  ok("portada: 9 productos sin JS; hidratación de filtros y contador sin cambios visibles");
 
   // Filtros: con JS se envían solos al marcar; sin JS con el botón.
   await filterOption(p3, "Negro").click();
@@ -156,10 +156,10 @@ try {
   await p3.waitForURL(/talla=s/);
   assert.deepEqual(await p3.locator(".product-card__name").allTextContents(), ["Camiseta Volcán"]);
   await js3.close();
-  await p1.goto(`${STORE}/categoria/camisetas`);
+  await p1.goto(`${STORE}/categoria/hombre`);
   await filterOption(p1, "Rojo").click();
   await p1.locator(".filters__apply").click();
-  await p1.waitForURL(/categoria\/camisetas\?color=rojo/);
+  await p1.waitForURL(/categoria\/hombre\?color=rojo/);
   assert.deepEqual(await p1.locator(".product-card__name").allTextContents(), ["Camiseta Sibú"]);
   ok("filtros: con JS al marcar (Negro → 2, + talla S → Camiseta Volcán); sin JS con el botón, dentro de la categoría");
 
@@ -408,12 +408,12 @@ try {
   ok("Tilopay simulado: rechazo vuelve al pago, retorno con firma falsa rechazado, y se completa con contra entrega");
   // ── M5: envíos ─────────────────────────────────────────────────────────────────────────────────────────────────
   // El comercio usa la Admin API (lo mismo que hace el Admin UI): en localhost, que Node sí resuelve.
-  const adminApi = async (query, variables = {}, token) => {
+  const adminApi = async (query, variables = {}, token, channel = "tienda-demo") => {
     const res = await fetch("http://localhost:3000/admin-api", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "vendure-token": "tienda-demo",
+        "vendure-token": channel,
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ query, variables }),
@@ -511,15 +511,26 @@ try {
   const pk = await mk.newPage();
   await pk.goto(`${MARKET}/`);
   assert.match(await text(pk.locator(".store-hero")), /Las tiendas de Costa Rica/);
-  assert.deepEqual((await pk.locator(".store-card__name").allTextContents()).sort(), ["Café Sur", "Tienda Demo"]);
+  assert.deepEqual((await pk.locator(".store-card__name").allTextContents()).sort(), [
+    "Barro y Telar",
+    "Café Sur",
+    "Tienda Demo",
+    "Voltio",
+  ]);
   await pk.goto(`${MARKET}/buscar?color=rojo`);
-  assert.deepEqual((await pk.locator(".product-card__name").allTextContents()).sort(), ["Camiseta Sibú", "Gorra Sibú"]);
+  assert.deepEqual((await pk.locator(".product-card__name").allTextContents()).sort(), [
+    "Bolso Tejido",
+    "Camiseta Sibú",
+    "Funda de Silicona",
+    "Gorra Sibú",
+    "Pañuelo Tucán",
+  ]);
   await pk.goto(`${MARKET}/buscar?moneda=USD`);
   assert.match(await text(pk.locator(".product-card__price").first()), /\$.*≈ ₡/);
   await pk.goto(`${MARKET}/categoria/moda`);
   await filterOption(pk, "Tienda Demo").click();
   await pk.waitForURL(/tienda=tienda-demo/);
-  assert.equal(await text(pk.locator(".listing__count")), "3 productos");
+  assert.equal(await text(pk.locator(".listing__count")), "9 productos");
   await pk.locator(".product-card__link", { hasText: "Gorra Sibú" }).click();
   await pk.waitForURL(`${STORE}/producto/gorra-sibu`);
   ok(
@@ -597,6 +608,106 @@ try {
   assert.match(download.suggestedFilename(), /^comisiones-\d{4}-\d{2}\.csv$/);
   await panel.close();
   ok("panel de comisiones: el comercio ve su pedido entregado como facturable (8 %) y exporta el CSV");
+  // ── M7: compras en las cuatro tiendas ──────────────────────────────────────────────────────────────────────────
+  const BARRO = STORE.replace("tienda-demo", "barro-telar");
+  const VOLTIO = STORE.replace("tienda-demo", "voltio");
+
+  // Barro y Telar sin JS: Correos (plato de 600 g → 1 kg en la GAM) y SINPE Móvil al número de la tienda.
+  const artisan = await browser.newContext({ javaScriptEnabled: false, viewport });
+  const pb = await artisan.newPage();
+  await buy(pb, BARRO, "plato-hondo");
+  const barroOrder = await checkout(pb, BARRO, {
+    ...guestData("Rosa"),
+    address: { name: "Rosa Prueba", district: "10201" },
+    shipping: "Correos de Costa Rica",
+    payment: "SINPE Móvil",
+  });
+  assert.match(await text(pb.locator(".payment")), /SINPE Móvil por ₡14 300 al 8777-1111 \(Barro y Telar\)/);
+  await artisan.close();
+  ok(`Barro y Telar sin JS: pedido ${barroOrder} por Correos (₡12 000 + ₡2 300) con SINPE Móvil a la tienda`);
+
+  // Voltio (USD) desde el marketplace: mensajería con rastreo y tarjeta (Tilopay simulado); se entrega y la comisión
+  // (5 %) queda facturable en dólares.
+  const tech = await browser.newContext({ viewport });
+  const pv = await tech.newPage();
+  await pv.goto(`${MARKET}/buscar?q=cargador`);
+  await pv.locator(".product-card__link", { hasText: "Cargador USB-C 20 W" }).click();
+  await pv.waitForURL(`${VOLTIO}/producto/cargador-usb-c-20-w`);
+  assert.equal(await text(pv.locator(".variants__price")), "$18");
+  await pv.locator(".add-to-cart__button").click();
+  await pv.locator(".add-to-cart__status", { hasText: "Agregado" }).waitFor();
+  await checkout(pv, VOLTIO, {
+    ...guestData("Victor"),
+    shipping: "Mensajería con rastreo",
+    payment: "Tarjeta",
+    expectOrder: false,
+  });
+  await pv.waitForURL(/pagos-simulados/);
+  await pv.click(".aprobar");
+  await pv.waitForURL(new RegExp(`${VOLTIO}/pedido/[A-Z0-9]+`));
+  assert.match(await text(pv.locator(".checkout__who")), /Pagado/);
+  assert.match(await text(pv.locator(".summary__total")), /\$22(?!,)/); // $18 + $4 de mensajería
+  const voltioOrder = await text(pv.locator(".order__code"));
+  await tech.close();
+
+  const { token: voltio } = await adminApi(
+    `mutation { login(username: "voltio@spora.localhost", password: "voltio1234") { __typename } }`,
+    {},
+    undefined,
+    "voltio",
+  );
+  const { data: vData } = await adminApi(
+    `query ($code: String!) { orders(options: { filter: { code: { eq: $code } } }) { items { id lines { id quantity } } } }`,
+    { code: voltioOrder },
+    voltio,
+    "voltio",
+  );
+  const { data: vFulfilled } = await adminApi(
+    `mutation ($input: FulfillOrderInput!) { addFulfillmentToOrder(input: $input) { ... on Fulfillment { id } ... on ErrorResult { message } } }`,
+    {
+      input: {
+        lines: vData.orders.items[0].lines.map((l) => ({ orderLineId: l.id, quantity: l.quantity })),
+        handler: { code: "trackingapp", arguments: [] },
+      },
+    },
+    voltio,
+    "voltio",
+  );
+  for (const event of ["en_camino", "entregado"]) {
+    await adminApi(
+      `mutation ($id: ID!, $event: String!) { simulateShipmentEvent(fulfillmentId: $id, event: $event) }`,
+      { id: vFulfilled.addFulfillmentToOrder.id, event },
+      voltio,
+      "voltio",
+    );
+  }
+  const month = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Costa_Rica",
+    year: "numeric",
+    month: "2-digit",
+  }).format(new Date());
+  let entry;
+  for (let i = 0; i < 20 && entry?.status !== "facturable"; i++) {
+    const { data: st } = await adminApi(
+      `query ($m: String!) { commissionStatement(month: $m) { entries { orderCode status currency baseAmount percentage amount } } }`,
+      { m: month },
+      voltio,
+      "voltio",
+    );
+    entry = st.commissionStatement.entries.find((e) => e.orderCode === voltioOrder);
+    if (entry?.status !== "facturable") await new Promise((r) => setTimeout(r, 300));
+  }
+  assert.deepEqual(entry, {
+    orderCode: voltioOrder,
+    status: "facturable",
+    currency: "USD",
+    baseAmount: 1800,
+    percentage: "5",
+    amount: 90,
+  });
+  ok(
+    `Voltio desde el marketplace: pedido ${voltioOrder} ($22, tarjeta y mensajería), entregado; comisión 5 % = $0,90 facturable`,
+  );
 } finally {
   await browser.close();
   console.log(results.join("\n"));

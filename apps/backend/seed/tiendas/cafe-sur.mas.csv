@@ -1,0 +1,9 @@
+name,slug,description,assets,facets,optionGroups,optionValues,sku,price,taxCategory,stockOnHand,trackInventory,variantAssets,variantFacets,product:marketplaceCategory,product:brand,variant:weightGrams
+Café de Naranjo,cafe-de-naranjo,"<p>Café de Naranjo, tueste oscuro. Notas de cacao.</p>",cafe-de-naranjo.svg,,Tamaño,340 g,CAFE-DE-NARA-340-G,11,IVA,12,true,cafe-de-naranjo.svg,,cafe-y-alimentos-cafe,cafe-sur,380
+,,,,,,1 kg,CAFE-DE-NARA-1-KG,29,IVA,12,true,cafe-de-naranjo.svg,,,,380
+Café Descafeinado,cafe-descafeinado,"<p>Descafeinado al agua de Tarrazú.</p>",cafe-descafeinado.svg,,,,CAFE-DESCAFE,13,IVA,12,true,cafe-descafeinado.svg,,cafe-y-alimentos-cafe,cafe-sur,380
+Cold Brew Concentrado,cold-brew-concentrado,"<p>Concentrado de café en frío: mezcle 1 a 3 con agua o leche.</p>",cold-brew-concentrado.svg,,Capacidad,500 ml,COLD-BREW-CO-500-ML,9,IVA,12,true,cold-brew-concentrado.svg,,cafe-y-alimentos-cafe,cafe-sur,550
+,,,,,,1 l,COLD-BREW-CO-1-L,15,IVA,12,true,cold-brew-concentrado.svg,,,,550
+Chocolate con Sal,chocolate-con-sal,"<p>Chocolate oscuro con sal de Guanacaste.</p>",chocolate-con-sal.svg,,,,CHOCOLATE-CO,6.5,IVA,12,true,chocolate-con-sal.svg,,cafe-y-alimentos-chocolate,cafe-sur,100
+Chocolate Blanco con Café,chocolate-blanco-con-cafe,"<p>Chocolate blanco con granos de café molido.</p>",chocolate-blanco-con-cafe.svg,,,,CHOCOLATE-BL,6.5,IVA,12,true,chocolate-blanco-con-cafe.svg,,cafe-y-alimentos-chocolate,cafe-sur,100
+Cacao en Polvo,cacao-en-polvo,"<p>Cacao puro sin azúcar de Talamanca.</p>",cacao-en-polvo.svg,,Tamaño,250 g,CACAO-EN-POL-250-G,8,IVA,12,true,cacao-en-polvo.svg,,cafe-y-alimentos-chocolate,cafe-sur,270

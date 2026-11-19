@@ -323,3 +323,30 @@ cómo revertirla.
 - **Qué:** la regla "sin categoría global no se publica" rechazaba publicar un producto que **sí** tenía categoría,
   porque en ese `update` Vendure no manda los custom fields. Lo encontró el e2e del marketplace.
 - **Arreglo:** si la actualización no trae la categoría, vale la guardada (`databaseEntity`). Hay test de regresión.
+
+## M7
+
+### 2026-11-19 — Catálogo de ejemplo generado
+- **Duda:** escribir a mano ~40 productos con variantes e imágenes.
+- **Decisión:** los productos originales siguen en `seed/tiendas/<tienda>.csv`; el resto sale de
+  `seed/generar-catalogo.mjs`, que escribe `<tienda>.mas.csv` (formato del importador de Vendure) e imágenes SVG
+  simples. Ambos se commitean: el seed no depende del generador. Las categorías de cada tienda se arman solas, con
+  cada producto en la categoría global más específica que lo abarca.
+- **Revertir:** reemplazar los `.mas.csv` y las imágenes por fotos reales.
+
+### 2026-11-19 — Pedidos del seed por la Shop API
+- **Decisión:** el cliente de prueba compra por la Shop API (como el storefront), la tienda despacha con
+  `createFulfillment` y el transportista reporta con `ShipmentEventsService` (lo mismo que usa el webhook). No se
+  insertan filas a mano: comisiones, stock y estados quedan coherentes. Si el cliente ya existe, no se repiten.
+- **Revertir:** no aplica.
+
+### 2026-11-19 — `pnpm seed` espera a la base
+- **Duda:** `docker compose up -d && pnpm install && pnpm seed` puede llegar al seed con PostgreSQL arrancando.
+- **Decisión:** `pnpm seed` corre `docker compose up -d --wait` antes (no hace nada si ya está arriba).
+- **Revertir:** quitarlo del script si la base no corre en Docker.
+
+### 2026-11-19 — Bug encontrado: paquete devuelto
+- **Qué:** con `devuelto` o `cancelado`, `transitionToState("Cancelled")` fallaba (Vendure no cancela un pedido con
+  líneas vivas). Lo encontró el seed.
+- **Arreglo:** `cancelOrder` (cancela líneas y devuelve el stock) y se cancela el pago autorizado (contra entrega que no
+  se cobró). Test de regresión en Vendure.

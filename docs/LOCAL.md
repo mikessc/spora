@@ -4,25 +4,26 @@
 Requisitos: Node ≥ 22.3, pnpm 9, Docker Desktop y Google Chrome (solo para `pnpm e2e`).
 
 ```sh
+docker compose up -d # PostgreSQL (5433) y Meilisearch (7700)
 pnpm install
-cp apps/backend/.env.example apps/backend/.env   # opcional: sin .env se usan los valores de desarrollo
-pnpm db              # PostgreSQL (5433) y Meilisearch (7700) en Docker
-pnpm seed            # migraciones + datos de ejemplo (idempotente)
+pnpm seed            # espera a la base, migraciones + datos de ejemplo (idempotente)
 pnpm dev             # Vendure + Admin UI (3000), storefront (4000) y marketplace (5000)
 ```
 
-Para empezar de cero: `pnpm db:reset && pnpm seed`.
+Sin `.env` se usan los valores de desarrollo (opcional: `cp apps/backend/.env.example apps/backend/.env`). Para
+empezar de cero: `pnpm db:reset && pnpm seed`. Recorrido guiado para revisar todo: [PRUEBA-MVP.md](PRUEBA-MVP.md).
 
 ## URLs
 | Qué | URL |
 | --- | --- |
 | Marketplace | <http://spora.localhost:5000/> |
 | Tienda demo (portada) | <http://tienda-demo.spora.localhost:4000/> |
-| Categoría con filtros | <http://tienda-demo.spora.localhost:4000/categoria/camisetas?color=negro> |
+| Categoría con filtros | <http://tienda-demo.spora.localhost:4000/categoria/hombre?color=rojo> |
 | Ficha de producto | <http://tienda-demo.spora.localhost:4000/producto/camiseta-sibu> |
 | Carrito y pago | <http://tienda-demo.spora.localhost:4000/carrito> → `/checkout/datos` |
 | Cuenta Spora | `/cuenta/ingresar`, `/cuenta/registro`, `/cuenta` en cualquier tienda |
-| Tienda en USD | <http://cafe-sur.spora.localhost:4000/> |
+| Tiendas en USD | <http://cafe-sur.spora.localhost:4000/>, <http://voltio.spora.localhost:4000/> |
+| Artesanía (CRC) | <http://barro-telar.spora.localhost:4000/> |
 | Otro estilo (vista previa) | agregar `?estilo=` con `suave`, `minimal`, `vibrante`, `editorial` o `pop` a cualquier página |
 | Sitemap / robots | <http://tienda-demo.spora.localhost:4000/sitemap.xml>, `/robots.txt` |
 | Admin UI (comercio y Spora) | <http://localhost:3000/admin> |
@@ -40,7 +41,10 @@ curl sin configurar nada.
 | Admin de Spora (superadmin) | `superadmin` | `superadmin` |
 | Comercio "Tienda Demo" (CRC, solo su canal) | `demo@spora.localhost` | `demo1234` |
 | Comercio "Café Sur" (USD, solo su canal) | `cafe@spora.localhost` | `cafe1234` |
-| Cliente | se crea en `/cuenta/registro` de cualquier tienda | |
+| Comercio "Barro y Telar" (CRC, solo su canal) | `barro@spora.localhost` | `barro1234` |
+| Comercio "Voltio" (USD, solo su canal) | `voltio@spora.localhost` | `voltio1234` |
+| Cliente con 5 pedidos en distintos estados | `cliente@spora.localhost` | `cliente1234` |
+| Cliente nuevo | se crea en `/cuenta/registro` de cualquier tienda | |
 
 ## Tareas comunes
 - **Tema de la tienda:** Admin UI (como el comercio) → Configuración → Canales → la tienda → pestaña "Tienda": estilo,
@@ -83,4 +87,9 @@ Sin credenciales del BCCR se usa la tasa fija `BCCR_SIMULATED_RATE` (₡515,00 p
 
 ## Chequeos
 - `pnpm check`: formato, tipos, tests (incluye Vendure en memoria con sql.js) y lint. No necesita servidores.
-- `pnpm e2e`: recorrido en Chrome; necesita `pnpm dev` corriendo.
+- `pnpm e2e`: recorrido en Chrome; necesita `pnpm seed` y `pnpm dev` corriendo.
+
+## Datos de ejemplo
+`pnpm seed` crea 4 tiendas (moda, café, artesanía y tecnología), 37 productos, marcas (una solo propuesta), métodos
+de pago y envío y el cliente de prueba con sus pedidos. Los productos están en `apps/backend/seed/tiendas/*.csv`
+(formato del importador de Vendure); los `*.mas.csv` y sus imágenes salen de `node apps/backend/seed/generar-catalogo.mjs`.

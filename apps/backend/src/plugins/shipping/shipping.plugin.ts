@@ -144,7 +144,7 @@ export class ShipmentEventsService {
 
     const to = async (state: "Shipped" | "Delivered" | "Cancelled") => {
       const result = await this.orders.transitionFulfillmentToState(ctx, fulfillment.id, state);
-      if ("errorCode" in result) throw new UserInputError(result.message);
+      if ("errorCode" in result) throw new UserInputError(`${result.message}: ${result.transitionError}`);
     };
     if ((event.kind === "en_camino" || event.kind === "entregado") && fulfillment.state === "Pending")
       await to("Shipped");
@@ -158,8 +158,13 @@ export class ShipmentEventsService {
     }
     if (event.kind === "devuelto" || event.kind === "cancelado") {
       if (fulfillment.state !== "Cancelled") await to("Cancelled");
-      const cancelled = await this.orders.transitionToState(ctx, order.id, "Cancelled");
+      // cancelOrder (no transitionToState): Vendure exige cancelar las líneas, y así también devuelve el stock.
+      const cancelled = await this.orders.cancelOrder(ctx, { orderId: order.id, reason: event.status });
       if ("errorCode" in cancelled) throw new UserInputError(cancelled.message);
+      // La contra entrega nunca se cobró.
+      for (const payment of order.payments.filter((p) => p.state === "Authorized")) {
+        await this.orders.cancelPayment(ctx, payment.id);
+      }
     }
     return "aplicado";
   }

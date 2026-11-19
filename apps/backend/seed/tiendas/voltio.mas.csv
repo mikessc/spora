@@ -1,0 +1,17 @@
+name,slug,description,assets,facets,optionGroups,optionValues,sku,price,taxCategory,stockOnHand,trackInventory,variantAssets,variantFacets,product:marketplaceCategory,product:brand,variant:weightGrams
+Audífonos Inalámbricos,audifonos-inalambricos,"<p>Audífonos bluetooth con cancelación de ruido.</p>",audifonos-inalambricos-negro.svg|audifonos-inalambricos-blanco.svg,,Color,Negro,AUDIFONOS-IN-NEGRO,59,IVA,12,true,audifonos-inalambricos-negro.svg,,tecnologia-audio,voltio,250
+,,,,,,Blanco,AUDIFONOS-IN-BLANCO,59,IVA,12,true,audifonos-inalambricos-blanco.svg,,,,250
+Parlante Portátil,parlante-portatil,"<p>Parlante resistente al agua, 12 horas de batería.</p>",parlante-portatil-negro.svg|parlante-portatil-azul.svg,,Color,Negro,PARLANTE-POR-NEGRO,45,IVA,12,true,parlante-portatil-negro.svg,,tecnologia-audio,voltio,600
+,,,,,,Azul,PARLANTE-POR-AZUL,45,IVA,12,true,parlante-portatil-azul.svg,,,,600
+Audífonos con Cable,audifonos-con-cable,"<p>Audífonos con micrófono y conector de 3,5 mm.</p>",audifonos-con-cable.svg,,,,AUDIFONOS-CO,15,IVA,12,true,audifonos-con-cable.svg,,tecnologia-audio,voltio,80
+Funda de Silicona,funda-de-silicona,"<p>Funda de silicona suave al tacto.</p>",funda-de-silicona-negro.svg|funda-de-silicona-rojo.svg|funda-de-silicona-azul.svg,,Color,Negro,FUNDA-DE-SIL-NEGRO,12,IVA,12,true,funda-de-silicona-negro.svg,,tecnologia-accesorios-para-celular,voltio,50
+,,,,,,Rojo,FUNDA-DE-SIL-ROJO,12,IVA,12,true,funda-de-silicona-rojo.svg,,,,50
+,,,,,,Azul,FUNDA-DE-SIL-AZUL,12,IVA,0,true,funda-de-silicona-azul.svg,,,,50
+Cargador USB-C 20 W,cargador-usb-c-20-w,"<p>Cargador rápido de pared USB-C.</p>",cargador-usb-c-20-w.svg,,,,CARGADOR-USB,18,IVA,12,true,cargador-usb-c-20-w.svg,,tecnologia-accesorios-para-celular,voltio,90
+Cable USB-C,cable-usb-c,"<p>Cable USB-C trenzado.</p>",cable-usb-c.svg,,Tamaño,1 m,CABLE-USB-C-1-M,8,IVA,12,true,cable-usb-c.svg,,tecnologia-accesorios-para-celular,voltio,60
+,,,,,,2 m,CABLE-USB-C-2-M,11,IVA,12,true,cable-usb-c.svg,,,,60
+Batería Portátil,bateria-portatil,"<p>Batería portátil con carga rápida.</p>",bateria-portatil.svg,,Capacidad,10 000 mAh,BATERIA-PORT-10-000-MAH,25,IVA,12,true,bateria-portatil.svg,,tecnologia-accesorios-para-celular,voltio,250
+,,,,,,20 000 mAh,BATERIA-PORT-20-000-MAH,39,IVA,12,true,bateria-portatil.svg,,,,250
+Soporte para Auto,soporte-para-auto,"<p>Soporte magnético para la rejilla del aire.</p>",soporte-para-auto.svg,,,,SOPORTE-PARA,14,IVA,12,true,soporte-para-auto.svg,,tecnologia-accesorios-para-celular,voltio,120
+Protector de Pantalla,protector-de-pantalla,"<p>Vidrio templado 9H, juego de 2.</p>",protector-de-pantalla.svg,,,,PROTECTOR-DE,9,IVA,12,true,protector-de-pantalla.svg,,tecnologia-accesorios-para-celular,voltio,40
+Lápiz Táctil,lapiz-tactil,"<p>Lápiz táctil universal con punta fina.</p>",lapiz-tactil.svg,,,,LAPIZ-TACTIL,19,IVA,12,true,lapiz-tactil.svg,,tecnologia-accesorios-para-celular,voltio,30

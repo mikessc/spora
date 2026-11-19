@@ -20,6 +20,27 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
   workaround en los componentes. Reporte para upstream en
   [reportes/sibujs-checked-ssr.md](reportes/sibujs-checked-ssr.md).
 
+## 2026-11-19 — M7: datos de ejemplo, pruebas de punta a punta y guía ✔ — **MVP completo**
+- Hecho:
+  - **`pnpm seed`**: 4 comercios con estilos distintos — Tienda Demo (moda, CRC, suave), Café Sur (café, USD,
+    editorial), Barro y Telar (artesanía, CRC, pop) y Voltio (tecnología, USD, minimal) — con 37 productos y sus
+    variantes (talla, color, tamaño, capacidad, algunas agotadas), categorías propias mapeadas a las globales, 4 marcas
+    aprobadas y una propuesta, pagos (contra entrega, SINPE, transferencia, PayPal, Tilopay) y envíos (a domicilio,
+    retiro, Correos, mensajería con TrackingApp) configurados.
+  - **Cliente de prueba** `cliente@spora.localhost` con 5 pedidos en estados distintos: entregado, en camino,
+    esperando comprobante (SINPE y transferencia) y devuelto. Se compran por la Shop API y se despachan con los mismos
+    servicios que el Admin UI y los webhooks, así que sus comisiones son reales (facturable, pendiente, anulada).
+  - `pnpm seed` espera a que la base esté lista; el clon limpio arranca con
+    `docker compose up -d && pnpm install && pnpm seed && pnpm dev`.
+  - **Guía de prueba**: [PRUEBA-MVP.md](PRUEBA-MVP.md), paso a paso con usuarios, URLs y qué debe verse.
+- Bug encontrado por el seed y corregido: un paquete **devuelto** no cancelaba el pedido (Vendure exige cancelar las
+  líneas: ahora usa `cancelOrder`, devuelve el stock y cancela la contra entrega que nunca se cobró). Test de regresión.
+- Tests: `pnpm check` (31 tests de integración de Vendure). `pnpm e2e` (25 recorridos) suma compras en **las cuatro
+  tiendas** con pagos y envíos distintos: Barro y Telar sin JS por Correos con SINPE; Voltio desde el marketplace con
+  mensajería y tarjeta, entregado por webhook firmado y con su comisión del 5 % facturable en dólares.
+- Pendiente (fuera del MVP o anotado antes): ver "Antes de producción", y los pendientes de M4–M6 (Correos real,
+  webhooks de pago, panel de comisiones dentro del Admin UI).
+
 ## 2026-11-19 — M6: comisiones y marketplace ✔
 - Hecho — **comisiones**:
   - Acuerdos por comercio con vigencias (el admin de Spora los edita); `registerStore` crea el inicial.
@@ -46,7 +67,6 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
 - Pendiente:
   - Panel de comisiones dentro del Admin UI (hoy es una página aparte con la misma sesión).
   - El JS de los filtros del marketplace pesa 114 KB (núcleo de SibuJS); ver "Antes de producción".
-- Sigue: **M7**, datos de ejemplo, pruebas de punta a punta y guía de prueba.
 
 ## 2026-11-19 — M5: envíos ✔
 - Hecho:
