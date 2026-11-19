@@ -131,7 +131,7 @@ Use una ventana privada para comprar sin cuenta, o siga con el cliente de prueba
      - lo que compró en el paso 4 como **pendiente**.
    - Totales por moneda; **CSV** descarga el estado de cuenta e **Imprimir** sirve para el PDF.
 2. Después de entregar el Plato Hondo (paso 5), entre como `barro@spora.localhost`.
-   - **Debe ver** ese pedido **facturable** al 10 %, solo sobre los productos (sin el envío).
+   - **Debe ver** ese pedido **facturable** al 10 %, solo sobre los productos, **sin IVA ni envío** (el IVA es de Hacienda, no del comercio).
 3. Ingrese como `superadmin`.
    - **Debe ver** todas las tiendas y sus acuerdos, con el porcentaje vigente editable desde una fecha.
    - **Cerrar el mes** agrupa lo facturable por tienda y moneda y lo marca **facturado**.

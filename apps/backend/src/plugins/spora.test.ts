@@ -1087,6 +1087,7 @@ describe("comisiones (M6)", () => {
           status
           currency
           baseAmount
+          baseIncludesTax
           percentage
           amount
           billingMonth
@@ -1127,13 +1128,14 @@ describe("comisiones (M6)", () => {
     const statement = await statementWhen((s) => s.entries.some((e) => e.status === "facturable"));
     const billable = statement.entries.filter((e: { status: string }) => e.status === "facturable");
     assert.equal(billable.length, 1);
-    // $10 de producto (sin envío) al 5 % por defecto = $0,50.
+    // $10 de producto con IVA (13 %) → base sin IVA ni envío de $8,85; al 5 % por defecto = $0,44.
     assert.deepEqual(billable[0], {
       ...billable[0],
       currency: "USD",
-      baseAmount: 1000,
+      baseAmount: 885,
+      baseIncludesTax: false,
       percentage: "5",
-      amount: 50,
+      amount: 44,
       billingMonth: month,
     });
     assert.ok(statement.entries.some((e: { status: string }) => e.status === "pendiente"));
@@ -1176,9 +1178,9 @@ describe("comisiones (M6)", () => {
       `,
       { m: month },
     );
-    assert.deepEqual(closeCommissionMonth, [{ sellerId: cafeSeller, currency: "USD", total: 50, entryCount: 1 }]);
+    assert.deepEqual(closeCommissionMonth, [{ sellerId: cafeSeller, currency: "USD", total: 44, entryCount: 1 }]);
     const after = await statementWhen(() => true);
-    assert.deepEqual(after.totals[0].facturado, 50);
+    assert.deepEqual(after.totals[0].facturado, 44);
     assert.deepEqual(after.totals[0].facturable, 0);
   });
 });

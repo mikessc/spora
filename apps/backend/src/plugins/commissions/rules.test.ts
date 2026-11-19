@@ -34,6 +34,12 @@ test("pedido de una tienda en CRC pagado en USD (PayPal): la comisión es en dó
   });
 });
 
+test("la base no lleva IVA: el subtotal sin impuesto (order.subTotal), no el que paga el cliente", () => {
+  // ₡6 500 con IVA del 13 % → Vendure guarda subTotal = ₡5 752,21; al 8 % la comisión es ₡460,18 (no ₡520).
+  const base = commissionBase({ amount: 575221, currency: "CRC" }, "CRC", null);
+  assert.deepEqual(commissionAmount(base, "8"), { amount: 46018, currency: "CRC" });
+});
+
 test("porcentajes: hasta 2 decimales y no más de 100", () => {
   assert.equal(percentageBasisPoints("7.25"), 725);
   assert.equal(percentageBasisPoints("100"), 10_000);

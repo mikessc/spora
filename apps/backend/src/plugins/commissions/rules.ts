@@ -24,7 +24,8 @@ export function agreementOn(agreements: Agreement[], day: string): Agreement | n
 export const billingMonth = (at: Date): string => businessDate(at).slice(0, 7);
 
 /**
- * La base de la comisión: el subtotal de productos (sin envío), en la moneda en que **entró el dinero**. Un pedido en
+ * La base de la comisión: el subtotal de productos **sin IVA ni envío** (`order.subTotal`; el IVA es de Hacienda, no
+ * del comercio), en la moneda en que **entró el dinero**. Un pedido en
  * colones pagado por PayPal cuenta en dólares, convertido con el tipo de cambio que guardó el pedido.
  */
 export function commissionBase(subTotal: Money, chargedIn: CurrencyCode, rate: string | null): Money {

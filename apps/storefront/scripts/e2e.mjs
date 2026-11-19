@@ -602,12 +602,12 @@ try {
   assert.match(await text(pc.locator("#quien")), /tienda tienda-demo/);
   const movements = await pc.locator("#movimientos tr").allTextContents();
   const delivered = movements.find((m) => m.includes(shippedOrder)) ?? "";
-  assert.match(delivered.replace(/\s+/g, " "), /facturable.*₡6 500.*8 %.*₡520/); // gorra ₡6 500 al 8 %
+  assert.match(delivered.replace(/\s+/g, " "), /facturable.*₡5 752,21.*8 %.*₡460,18/); // gorra ₡6 500 con IVA → ₡5 752,21 sin IVA, al 8 %
   assert.match(await text(pc.locator("#totales")), /CRC/);
   const [download] = await Promise.all([pc.waitForEvent("download"), pc.click("#csv")]);
   assert.match(download.suggestedFilename(), /^comisiones-\d{4}-\d{2}\.csv$/);
   await panel.close();
-  ok("panel de comisiones: el comercio ve su pedido entregado como facturable (8 %) y exporta el CSV");
+  ok("panel de comisiones: el comercio ve su pedido entregado como facturable (8 % sin IVA) y exporta el CSV");
 
   // El comercio edita su tienda en /panel/tienda (updateStoreSettings; ya no tiene updateChannel).
   const themePanel = await browser.newContext({ viewport });
@@ -732,12 +732,12 @@ try {
     orderCode: voltioOrder,
     status: "facturable",
     currency: "USD",
-    baseAmount: 1800,
+    baseAmount: 1593, // $18 con IVA → $15,93 sin IVA
     percentage: "5",
-    amount: 90,
+    amount: 80,
   });
   ok(
-    `Voltio desde el marketplace: pedido ${voltioOrder} ($22, tarjeta y mensajería), entregado; comisión 5 % = $0,90 facturable`,
+    `Voltio desde el marketplace: pedido ${voltioOrder} ($22, tarjeta y mensajería), entregado; comisión 5 % sin IVA = $0,80 facturable`,
   );
 } finally {
   await browser.close();

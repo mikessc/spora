@@ -4,7 +4,7 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  * Privacidad: hasta ahora un cliente quedaba asignado a cada tienda que visitaba con la sesión iniciada. Se le quita de
  * las tiendas donde nunca hizo un pedido (sigue en el canal del marketplace). No se puede deshacer: down no hace nada.
  */
-export class ClientesSoloAlComprar1795200000000 implements MigrationInterface {
+export class ClientesSoloAlComprar1795127000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<any> {
     await queryRunner.query(
       `DELETE FROM "customer_channels_channel" cc

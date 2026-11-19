@@ -44,7 +44,10 @@ export class CommissionEntry extends VendureEntity {
   @Column("varchar") storeName!: string;
   /** Moneda en que entró el dinero. */
   @Column("varchar") currency!: CurrencyCode;
+  /** Base: subtotal de productos sin IVA ni envío. */
   @Column("int") baseAmount!: number;
+  /** Movimientos anteriores al cambio (base con IVA): no se recalculan, quedan marcados. */
+  @Column("boolean", { default: false }) baseIncludesTax!: boolean;
   @Column("varchar") percentage!: string;
   @Column("int") amount!: number;
   @Column("varchar", { default: "pendiente" }) status!: CommissionStatus;
@@ -117,8 +120,9 @@ export class CommissionService implements OnApplicationBootstrap {
     const placedAt = order.orderPlacedAt ?? new Date();
     const agreement = agreementOn(await this.agreements(ctx, store.seller.id), businessDate(placedAt));
     const percentage = agreement?.percentage ?? process.env.SPORA_COMISION_POR_DEFECTO ?? "5";
+    // Sin IVA: el impuesto es de Hacienda, no del comercio.
     const base = commissionBase(
-      { amount: order.subTotalWithTax, currency: order.currencyCode as CurrencyCode },
+      { amount: order.subTotal, currency: order.currencyCode as CurrencyCode },
       chargedIn,
       order.customFields.exchangeRate,
     );

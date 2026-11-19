@@ -132,6 +132,7 @@
 
     <h2>Totales del mes</h2>
     <p class="muted">
+      La base es el subtotal de productos <strong>sin IVA</strong> ni envío (el IVA es de Hacienda, no del comercio).
       Pendiente: pedidos aún sin entregar. Facturable: entregados este mes. Facturado: ya en un estado de cuenta.
     </p>
     <table>
@@ -155,13 +156,14 @@
           <th>Tienda</th>
           <th>Fecha</th>
           <th>Estado</th>
-          <th class="num">Base</th>
+          <th class="num">Base sin IVA</th>
           <th class="num">%</th>
           <th class="num">Comisión</th>
         </tr>
       </thead>
       <tbody id="movimientos"></tbody>
     </table>
+    <p class="muted" id="nota-iva" hidden>* Movimiento anterior al cambio: su base incluye IVA y no se recalculó.</p>
 
     <section class="admin-only" hidden>
       <h2>Acuerdo del comercio</h2>
@@ -250,7 +252,7 @@
           await api(
             `query ($month: String!, $sellerId: ID) { commissionStatement(month: $month, sellerId: $sellerId) {
               totals { currency pendiente facturable facturado anulado }
-              entries { orderCode storeName status currency baseAmount percentage amount placedAt billingMonth } } }`,
+              entries { orderCode storeName status currency baseAmount baseIncludesTax percentage amount placedAt billingMonth } } }`,
             { month: $("mes").value, sellerId },
           )
         ).commissionStatement;
@@ -269,10 +271,11 @@
           <td>${esc(e.orderCode)}</td><td>${esc(e.storeName)}</td>
           <td>${new Date(e.placedAt).toLocaleDateString("es-CR", { timeZone: "America/Costa_Rica" })}</td>
           <td><span class="badge ${e.status}">${e.status}</span></td>
-          <td class="num">${money(e.baseAmount, e.currency)}</td><td class="num">${esc(e.percentage)} %</td>
+          <td class="num">${money(e.baseAmount, e.currency)}${e.baseIncludesTax ? ' <abbr title="Anterior al cambio: base con IVA">*</abbr>' : ""}</td><td class="num">${esc(e.percentage)} %</td>
           <td class="num">${money(e.amount, e.currency)}</td></tr>`,
           )
           .join("");
+        $("nota-iva").hidden = !statement.entries.some((e) => e.baseIncludesTax);
         if (isAdmin) await loadAdmin(sellerId);
       }
 
@@ -301,7 +304,18 @@
 
       function exportCsv() {
         const rows = [
-          ["pedido", "tienda", "fecha", "estado", "moneda", "base", "porcentaje", "comision", "mes_facturacion"],
+          [
+            "pedido",
+            "tienda",
+            "fecha",
+            "estado",
+            "moneda",
+            "base",
+            "base_tipo",
+            "porcentaje",
+            "comision",
+            "mes_facturacion",
+          ],
         ];
         for (const e of statement?.entries ?? []) {
           rows.push([
@@ -311,6 +325,7 @@
             e.status,
             e.currency,
             (e.baseAmount / 100).toFixed(2),
+            e.baseIncludesTax ? "con IVA (anterior al cambio)" : "sin IVA",
             e.percentage,
             (e.amount / 100).toFixed(2),
             e.billingMonth ?? "",

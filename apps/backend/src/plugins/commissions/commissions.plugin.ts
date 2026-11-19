@@ -106,7 +106,10 @@ class CommissionPanelController {
         storeName: String!
         status: String!
         currency: String!
+        "Subtotal de productos sin IVA ni envío."
         baseAmount: Money!
+        "true en movimientos anteriores al cambio a base sin IVA (no se recalculan)."
+        baseIncludesTax: Boolean!
         percentage: String!
         amount: Money!
         placedAt: DateTime!
