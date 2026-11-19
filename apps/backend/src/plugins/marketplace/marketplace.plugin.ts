@@ -51,6 +51,8 @@ export class MarketplaceIndexService implements OnApplicationBootstrap {
         filterableAttributes: ["categories", "brand", "storeToken", "attributes", "priceCrc", "currency", "available"],
         sortableAttributes: ["priceCrc", "name"],
       })
+      // Se espera: reindexStore filtra por storeToken, y el índice tiene que existir con ese filtro.
+      .waitTask()
       .catch((err) => Logger.error(`Meilisearch: ${String(err)}`, "Spora"));
     await this.client
       .index(STORES_INDEX)
@@ -95,13 +97,14 @@ export class MarketplaceIndexService implements OnApplicationBootstrap {
     const { port, shopApiPath } = this.config.apiOptions;
     const shop = createShopClient({ url: `http://localhost:${port}/${shopApiPath}`, channelToken: token });
     const products = this.client.index(PRODUCTS_INDEX);
-    await products.deleteDocuments({ filter: `storeToken = "${token.replace(/"/g, "")}"` });
+    const filter = `storeToken = "${token.replace(/"/g, "")}"`;
     let store;
     try {
       store = await shop.store();
     } catch (err) {
       // Tienda pendiente, suspendida o borrada: queda fuera del marketplace (solo `activo` publica).
       if (err instanceof ShopApiError && ["STORE_NOT_ACTIVE", "CHANNEL_NOT_FOUND"].includes(err.code ?? "")) {
+        await products.deleteDocuments({ filter });
         await this.client.index(STORES_INDEX).deleteDocument(token);
         return;
       }
@@ -118,7 +121,14 @@ export class MarketplaceIndexService implements OnApplicationBootstrap {
       brandNames: new Map(brands.map((b) => [b.slug, b.name])),
       rate: rate.rate,
     });
+    // Primero se reemplaza y después se borra lo que ya no está (Meilisearch aplica las tareas en orden): mientras se
+    // reindexa, la tienda nunca desaparece del marketplace.
+    // ponytail: hasta 10 000 productos por tienda; más allá, paginar getDocuments.
+    const { results: indexed } = await products.getDocuments<{ id: string }>({ filter, fields: ["id"], limit: 10_000 });
+    const keep = new Set(docs.products.map((p) => p.id));
     if (docs.products.length) await products.addDocuments(docs.products, { primaryKey: "id" });
+    const gone = indexed.map((d) => d.id).filter((id) => !keep.has(id));
+    if (gone.length) await products.deleteDocuments(gone);
     await this.client.index(STORES_INDEX).addDocuments([docs.store], { primaryKey: "id" });
   }
 }
