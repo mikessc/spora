@@ -454,6 +454,17 @@ export function createShopClient({ url, channelToken, cookie, onSetCookie }: Sho
       return sporaOrders.map(toOrderSummary);
     },
 
+    /** El cliente dice si recibió su pedido (solo el dueño). Sí: queda entregado. No: queda en disputa. */
+    async reportDelivery(orderCode: string, received: boolean): Promise<void> {
+      await request(
+        "mutation ReportDelivery($code: String!, $received: Boolean!) { reportOrderDelivery(orderCode: $code, received: $received) }",
+        {
+          code: orderCode,
+          received,
+        },
+      );
+    },
+
     async saveAddress(address: Address): Promise<void> {
       await request("mutation SaveAddress($input: CreateAddressInput!) { sporaCreateAddress(input: $input) { id } }", {
         input: toAddressInput(address),

@@ -91,12 +91,44 @@ function RegisterPage({ error, values, back }: { error?: string; values: Record<
   ]);
 }
 
+/** "¿Recibiste tu pedido?" con dos formularios (funciona sin JS); o el aviso si dijo que no lo recibió. */
+function deliveryRow(o: OrderSummary) {
+  if (o.deliveryReport === "no-recibido") {
+    return tr("account__delivery", [
+      td({ colspan: "6" }, `Nos dijo que no recibió el pedido ${o.code}: Spora lo está revisando con la tienda.`),
+    ]);
+  }
+  if (!o.canConfirmDelivery) return null;
+  const answer = (value: "si" | "no", text: string, cls: string) =>
+    form({ class: "account__delivery-form", method: "post", action: "/cuenta/pedido/entrega" }, [
+      input({ type: "hidden", name: "pedido", value: o.code }),
+      input({ type: "hidden", name: "recibido", value }),
+      button({ class: cls, type: "submit" }, text),
+    ]);
+  return tr("account__delivery", [
+    td({ colspan: "6" }, [
+      p("account__delivery-question", `¿Recibiste tu pedido ${o.code}?`),
+      div("account__delivery-actions", [
+        answer("si", "Sí, lo recibí", "form__submit"),
+        answer("no", "No lo recibí", "form__secondary"),
+      ]),
+    ]),
+  ]);
+}
+
+const DELIVERY_NOTICES: Record<string, string> = {
+  recibido: "¡Gracias! Marcamos su pedido como entregado.",
+  disputa: "Gracias por avisar. Spora va a revisar el pedido con la tienda.",
+  error: "No se pudo registrar su respuesta. Intente de nuevo.",
+};
+
 const addressText = (a: Address) => `${a.street}, ${a.district}, ${a.canton}, ${a.province} (${a.postalCode})`;
 
-function AccountPage(customer: Customer, orders: OrderSummary[], storeUrl: (token: string) => string) {
+function AccountPage(customer: Customer, orders: OrderSummary[], storeUrl: (token: string) => string, notice?: string) {
   return main("account", [
     h1("account__title", `Hola, ${customer.firstName}`),
     p("account__intro", `${customer.firstName} ${customer.lastName} · ${customer.email}`),
+    notice ? p({ class: "account__notice", role: "status" }, notice) : null,
     section("account__section", [
       h2("Mis pedidos en todas las tiendas"),
       orders.length
@@ -112,7 +144,7 @@ function AccountPage(customer: Customer, orders: OrderSummary[], storeUrl: (toke
               ]),
             ]),
             tbody(
-              orders.map((o) =>
+              orders.flatMap((o) => [
                 tr([
                   td([a({ href: `${storeUrl(o.storeToken)}/pedido/${o.code}` }, o.code)]),
                   td([a({ href: storeUrl(o.storeToken) }, o.storeName)]),
@@ -131,7 +163,8 @@ function AccountPage(customer: Customer, orders: OrderSummary[], storeUrl: (toke
                   ),
                   td(formatMoney(o.total)),
                 ]),
-              ),
+                deliveryRow(o),
+              ]),
             ),
           ])
         : p("Todavía no tiene pedidos."),
@@ -236,11 +269,23 @@ export function registerAccountRoutes(app: Hono<Env>, render: Render, storeUrlFo
       const url = new URL(c.req.url);
       const storeUrl = (token: string) => storeUrlFor(token, url);
       return {
-        content: () => AccountPage(customer, orders, storeUrl),
+        content: () => AccountPage(customer, orders, storeUrl, DELIVERY_NOTICES[c.req.query("entrega") ?? ""]),
         meta: { title: `Mi cuenta · ${store.name}`, noindex: true },
       };
     }),
   );
+
+  // Respuesta a "¿Recibiste tu pedido?". El backend revisa que el pedido sea de quien responde.
+  app.post("/cuenta/pedido/entrega", async (c) => {
+    const form = await c.req.formData();
+    const received = field(form, "recibido") === "si";
+    try {
+      await c.get("shop").reportDelivery(field(form, "pedido"), received);
+      return c.redirect(`/cuenta?entrega=${received ? "recibido" : "disputa"}`, 303);
+    } catch {
+      return c.redirect("/cuenta?entrega=error", 303);
+    }
+  });
 
   app.post("/cuenta/salir", async (c) => {
     await c.get("shop").logout();

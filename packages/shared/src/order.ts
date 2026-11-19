@@ -89,6 +89,19 @@ export interface PaymentOption {
   eligible: boolean;
 }
 
+/** Lo que dijo el cliente sobre la entrega: la recibió, o no (el pedido queda en disputa). */
+export type DeliveryReport = "recibido" | "no-recibido";
+
+/**
+ * ¿El pedido espera que el cliente confirme la entrega? Enviado y sin entregar, o de retiro en local y ya hecho; nunca
+ * si el cliente ya respondió, ni entregado ni cancelado.
+ */
+export function canConfirmDelivery(order: { state: string; pickup: boolean; report: DeliveryReport | null }): boolean {
+  if (order.report) return false;
+  if (order.state === "Shipped" || order.state === "PartiallyShipped") return true;
+  return order.pickup && (order.state === "PaymentAuthorized" || order.state === "PaymentSettled");
+}
+
 /** Un pedido en el historial de la Cuenta Spora (todas las tiendas). */
 export interface OrderSummary {
   code: string;
@@ -99,6 +112,9 @@ export interface OrderSummary {
   storeName: string;
   storeToken: string;
   shipment: Pick<Shipment, "method" | "trackingCode" | "trackingUrl" | "status"> | null;
+  /** Muestra "¿Recibiste tu pedido?". */
+  canConfirmDelivery: boolean;
+  deliveryReport: DeliveryReport | null;
 }
 
 /** Estados de Vendure en palabras del cliente. */

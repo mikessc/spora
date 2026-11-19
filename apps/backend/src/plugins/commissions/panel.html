@@ -94,6 +94,9 @@
       .badge.anulado {
         background: #f6dcdc;
       }
+      .badge.en_disputa {
+        background: #f9e7c4;
+      }
       .error {
         color: #b42318;
       }
@@ -133,7 +136,8 @@
     <h2>Totales del mes</h2>
     <p class="muted">
       La base es el subtotal de productos <strong>sin IVA</strong> ni envío (el IVA es de Hacienda, no del comercio).
-      Pendiente: pedidos aún sin entregar. Facturable: entregados este mes. Facturado: ya en un estado de cuenta.
+      Pendiente: pedidos aún sin entregar. Facturable: entregados este mes. Facturado: ya en un estado de cuenta. En
+      disputa: el cliente dijo que no lo recibió (no se factura).
     </p>
     <table>
       <thead>
@@ -143,10 +147,47 @@
           <th class="num">Facturable</th>
           <th class="num">Facturado</th>
           <th class="num">Anulado</th>
+          <th class="num">En disputa</th>
         </tr>
       </thead>
       <tbody id="totales"></tbody>
     </table>
+
+    <section id="por-cierre-seccion" hidden>
+      <h2>Se facturarán al cierre sin confirmar entrega</h2>
+      <p class="muted">
+        Pedidos pendientes que nadie marcó como entregados. Desde la fecha indicada, el cierre de mes los factura igual.
+        Si ya los entregó, márquelos como entregados en el Admin UI; si no se van a entregar, cancélelos.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Pedido</th>
+            <th>Tienda</th>
+            <th>Fecha del pedido</th>
+            <th>Se factura al cierre desde</th>
+            <th class="num">Comisión</th>
+          </tr>
+        </thead>
+        <tbody id="por-cierre"></tbody>
+      </table>
+    </section>
+
+    <section id="disputas-seccion" hidden>
+      <h2>Pedidos en disputa</h2>
+      <p class="muted">El cliente dijo que no recibió el pedido. Su comisión no se factura hasta resolverlo.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Pedido</th>
+            <th>Tienda</th>
+            <th>Fecha del pedido</th>
+            <th class="num">Comisión</th>
+          </tr>
+        </thead>
+        <tbody id="disputas"></tbody>
+      </table>
+    </section>
 
     <h2>Movimientos</h2>
     <table>
@@ -251,8 +292,9 @@
         statement = (
           await api(
             `query ($month: String!, $sellerId: ID) { commissionStatement(month: $month, sellerId: $sellerId) {
-              totals { currency pendiente facturable facturado anulado }
-              entries { orderCode storeName status currency baseAmount baseIncludesTax percentage amount placedAt billingMonth } } }`,
+              totals { currency pendiente facturable facturado anulado en_disputa }
+              entries { orderId orderCode storeName status currency baseAmount baseIncludesTax percentage amount placedAt
+                billingMonth closedWithoutDelivery autoBillableFrom } } }`,
             { month: $("mes").value, sellerId },
           )
         ).commissionStatement;
@@ -260,22 +302,42 @@
           statement.totals
             .map(
               (t) =>
-                `<tr><td>${t.currency}</td>${["pendiente", "facturable", "facturado", "anulado"]
+                `<tr><td>${t.currency}</td>${["pendiente", "facturable", "facturado", "anulado", "en_disputa"]
                   .map((k) => `<td class="num">${money(t[k], t.currency)}</td>`)
                   .join("")}</tr>`,
             )
-            .join("") || '<tr><td colspan="5" class="muted">Sin movimientos este mes.</td></tr>';
+            .join("") || '<tr><td colspan="6" class="muted">Sin movimientos este mes.</td></tr>';
         $("movimientos").innerHTML = statement.entries
           .map(
             (e) => `<tr>
           <td>${esc(e.orderCode)}</td><td>${esc(e.storeName)}</td>
           <td>${new Date(e.placedAt).toLocaleDateString("es-CR", { timeZone: "America/Costa_Rica" })}</td>
-          <td><span class="badge ${e.status}">${e.status}</span></td>
+          <td><span class="badge ${e.status}">${e.status.replace("_", " ")}</span>${e.closedWithoutDelivery ? ' <span class="muted">· facturado al cierre sin confirmar entrega</span>' : ""}</td>
           <td class="num">${money(e.baseAmount, e.currency)}${e.baseIncludesTax ? ' <abbr title="Anterior al cambio: base con IVA">*</abbr>' : ""}</td><td class="num">${esc(e.percentage)} %</td>
           <td class="num">${money(e.amount, e.currency)}</td></tr>`,
           )
           .join("");
         $("nota-iva").hidden = !statement.entries.some((e) => e.baseIncludesTax);
+        const day = (iso) => new Date(iso).toLocaleDateString("es-CR", { timeZone: "America/Costa_Rica" });
+        const orderLink = (e) => `<a href="/admin/orders/${esc(e.orderId)}">${esc(e.orderCode)}</a>`;
+        const due = statement.entries
+          .filter((e) => e.autoBillableFrom)
+          .sort((a, b) => (a.autoBillableFrom < b.autoBillableFrom ? -1 : 1));
+        $("por-cierre-seccion").hidden = !due.length;
+        $("por-cierre").innerHTML = due
+          .map(
+            (e) => `<tr><td>${orderLink(e)}</td><td>${esc(e.storeName)}</td><td>${day(e.placedAt)}</td>
+          <td>${day(`${e.autoBillableFrom}T12:00:00-06:00`)}</td><td class="num">${money(e.amount, e.currency)}</td></tr>`,
+          )
+          .join("");
+        const disputes = statement.entries.filter((e) => e.status === "en_disputa");
+        $("disputas-seccion").hidden = !disputes.length;
+        $("disputas").innerHTML = disputes
+          .map(
+            (e) => `<tr><td>${orderLink(e)}</td><td>${esc(e.storeName)}</td><td>${day(e.placedAt)}</td>
+          <td class="num">${money(e.amount, e.currency)}</td></tr>`,
+          )
+          .join("");
         if (isAdmin) await loadAdmin(sellerId);
       }
 
@@ -315,6 +377,7 @@
             "porcentaje",
             "comision",
             "mes_facturacion",
+            "nota",
           ],
         ];
         for (const e of statement?.entries ?? []) {
@@ -329,6 +392,11 @@
             e.percentage,
             (e.amount / 100).toFixed(2),
             e.billingMonth ?? "",
+            e.closedWithoutDelivery
+              ? "facturado al cierre sin confirmar entrega"
+              : e.autoBillableFrom
+                ? `se factura al cierre desde ${e.autoBillableFrom} si no se entrega`
+                : "",
           ]);
         }
         const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
@@ -347,7 +415,12 @@
       $("cerrar").addEventListener(
         "click",
         guard(async () => {
-          if (!confirm(`¿Cerrar ${$("mes").value}? Lo facturable pasa a facturado.`)) return;
+          if (
+            !confirm(
+              `¿Cerrar ${$("mes").value}? Lo facturable pasa a facturado, y lo pendiente con los días de gracia cumplidos se factura sin confirmar entrega.`,
+            )
+          )
+            return;
           await api(`mutation ($m: String!) { closeCommissionMonth(month: $m) { id } }`, { m: $("mes").value });
           await load();
         }),

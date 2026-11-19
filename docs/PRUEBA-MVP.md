@@ -75,8 +75,15 @@ En <http://tienda-demo.spora.localhost:4000/producto/camiseta-sibu>:
    | Café Sur | Café Tarrazú | Envío a domicilio, transferencia | **Confirmado** (falta el comprobante) |
    | Tienda Demo | Gorra Sibú | Envío a domicilio, contra entrega | **Cancelado** (el paquete se devolvió) |
 
-3. Pase a otra tienda o al marketplace.
+3. **¿Recibiste tu pedido?**: debajo de los pedidos enviados sin entregar (Voltio) y de los de retiro (Barro y Telar)
+   aparece la pregunta con dos botones. Funciona también sin JavaScript.
+   - **"Sí, lo recibí"** en la Taza de Barro: el pedido pasa a **Entregado** y su comisión a facturable.
+   - **"No lo recibí"** en los Audífonos: queda el aviso "Nos dijo que no recibió el pedido…" y el pedido pasa a
+     **en disputa** (paso 6).
+4. Pase a otra tienda o al marketplace.
    - **Debe seguir** con la sesión iniciada: una sola cuenta para todo Spora.
+   - Las tiendas solo la ven entre sus clientes (Admin UI → Clientes) si ya les compró: visitar o llenar el carrito
+     no comparte sus datos.
 
 ## 4. Comprar en cada tienda
 Use una ventana privada para comprar sin cuenta, o siga con el cliente de prueba.
@@ -129,12 +136,19 @@ Use una ventana privada para comprar sin cuenta, o siga con el cliente de prueba
      - la Camiseta Sibú del cliente de prueba como **facturable**, al 8 %;
      - la Gorra devuelta como **anulada**;
      - lo que compró en el paso 4 como **pendiente**.
-   - Totales por moneda; **CSV** descarga el estado de cuenta e **Imprimir** sirve para el PDF.
+   - **"Se facturarán al cierre sin confirmar entrega"**: los pendientes, con la fecha desde la que el cierre de mes los
+     factura igual (7 días después del pedido, `SPORA_DIAS_GRACIA_CIERRE`). Si ya los entregó, márquelos entregados;
+     si no, cancélelos.
+   - Totales por moneda; **CSV** descarga el estado de cuenta e **Imprimir** sirve para el PDF. La base dice
+     **sin IVA**.
 2. Después de entregar el Plato Hondo (paso 5), entre como `barro@spora.localhost`.
    - **Debe ver** ese pedido **facturable** al 10 %, solo sobre los productos, **sin IVA ni envío** (el IVA es de Hacienda, no del comercio).
 3. Ingrese como `superadmin`.
    - **Debe ver** todas las tiendas y sus acuerdos, con el porcentaje vigente editable desde una fecha.
-   - **Cerrar el mes** agrupa lo facturable por tienda y moneda y lo marca **facturado**.
+   - **"Pedidos en disputa"**: los Audífonos de Voltio si el cliente dijo que no los recibió (paso 3). No se facturan.
+   - **Cerrar el mes**: lo pendiente con 7 días o más (y sin cancelar ni en disputa) pasa a facturable con la marca
+     "facturado al cierre sin confirmar entrega"; después todo lo facturable se agrupa por tienda y moneda y queda
+     **facturado**.
 
 ## 7. Lo que hace el admin de Spora
 Como `superadmin` en el Admin UI y en la Admin API:

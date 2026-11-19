@@ -232,6 +232,7 @@ export const SPORA_ORDERS_QUERY = `query SporaOrders {
   sporaOrders {
     code state orderPlacedAt total currencyCode exchangeRate storeName storeToken
     shipment { method trackingCode trackingUrl status }
+    canConfirmDelivery deliveryReport
   }
 }`;
 
@@ -245,6 +246,8 @@ export const toOrderSummary = (o: {
   storeName: string;
   storeToken: string;
   shipment: OrderSummary["shipment"];
+  canConfirmDelivery: boolean;
+  deliveryReport: OrderSummary["deliveryReport"];
 }): OrderSummary => ({
   code: o.code,
   state: o.state,
@@ -254,4 +257,6 @@ export const toOrderSummary = (o: {
   storeName: o.storeName,
   storeToken: o.storeToken,
   shipment: o.shipment,
+  canConfirmDelivery: o.canConfirmDelivery,
+  deliveryReport: o.deliveryReport,
 });

@@ -10,6 +10,7 @@ import { after, before, describe, test } from "node:test";
 import { AccountPlugin } from "./account/account.plugin";
 import { CatalogPlugin } from "./catalog/catalog.plugin";
 import { CommissionsPlugin } from "./commissions/commissions.plugin";
+import { CommissionEntry } from "./commissions/commissions.service";
 import { MarketplacePlugin } from "./marketplace/marketplace.plugin";
 import { CurrencyPlugin } from "./currency/currency.plugin";
 import { sign } from "./payments/gateways";
@@ -1182,5 +1183,277 @@ describe("comisiones (M6)", () => {
     const after = await statementWhen(() => true);
     assert.deepEqual(after.totals[0].facturado, 44);
     assert.deepEqual(after.totals[0].facturable, 0);
+  });
+});
+
+describe("entrega confirmada por el cliente y cierre con días de gracia", () => {
+  const DEFAULT_TOKEN = testConfig.defaultChannelToken ?? "e2e-default-channel";
+  const RESULT = `__typename ... on Order { code state } ... on ErrorResult { errorCode message }`;
+  const rosa = { emailAddress: "rosa@correo.cr", password: "clave-segura" };
+  const month = businessDate().slice(0, 7);
+  const REPORT = gql`
+    mutation ($code: String!, $received: Boolean!) {
+      reportOrderDelivery(orderCode: $code, received: $received)
+    }
+  `;
+  const entries = () => server.app.get(TransactionalConnection).rawConnection.getRepository(CommissionEntry);
+  /** Espera a que el movimiento del pedido llegue a un estado (las comisiones van por eventos). */
+  const entryWhen = async (code: string, status: string) => {
+    for (let i = 0; i < 50; i++) {
+      const entry = await entries().findOneBy({ orderCode: code });
+      if (entry?.status === status) return entry;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error(
+      `El movimiento de ${code} no llegó a ${status}: ${(await entries().findOneBy({ orderCode: code }))?.status}`,
+    );
+  };
+
+  /** Un pedido de Rosa en Café Sur con contra entrega. */
+  async function placeOrder(shipping: "Envío a domicilio" | "Retiro en local") {
+    shopClient.setChannelToken("cafe-sur");
+    const { product } = await shopClient.query(gql`
+      query {
+        product(slug: "cafe-500") {
+          variants {
+            id
+          }
+        }
+      }
+    `);
+    await shopClient.query(
+      gql`mutation ($id: ID!) { addItemToOrder(productVariantId: $id, quantity: 1) { ${RESULT} } }`,
+      { id: product.variants[0].id },
+    );
+    await shopClient.query(
+      gql`mutation ($input: CreateAddressInput!) { setOrderShippingAddress(input: $input) { ${RESULT} } }`,
+      {
+        input: {
+          fullName: "Rosa Vargas",
+          streetLine1: "Frente a la plaza",
+          city: "Escazú",
+          province: "San José",
+          postalCode: "10201",
+          countryCode: "CR",
+        },
+      },
+    );
+    const { eligibleShippingMethods } = await shopClient.query(gql`
+      query {
+        eligibleShippingMethods {
+          id
+          name
+        }
+      }
+    `);
+    const method = eligibleShippingMethods.find((m: { name: string }) => m.name === shipping);
+    await shopClient.query(
+      gql`mutation ($id: [ID!]!) { setOrderShippingMethod(shippingMethodId: $id) { ${RESULT} } }`,
+      { id: [method.id] },
+    );
+    await shopClient.query(gql`mutation { transitionOrderToState(state: "ArrangingPayment") { ${RESULT} } }`);
+    const { addPaymentToOrder } = await shopClient.query(
+      gql`mutation { addPaymentToOrder(input: { method: "cafe-sur-contra-entrega", metadata: {} }) { ${RESULT} } }`,
+    );
+    assert.equal(addPaymentToOrder.state, "PaymentAuthorized");
+    return addPaymentToOrder.code as string;
+  }
+
+  /** La tienda despacha (envío propio) y el envío sale: el pedido queda "Enviado". */
+  async function ship(code: string) {
+    await adminClient.asSuperAdmin();
+    adminClient.setChannelToken("cafe-sur");
+    try {
+      const { orders } = await adminClient.query(
+        gql`
+          query ($code: String!) {
+            orders(options: { filter: { code: { eq: $code } } }) {
+              items {
+                id
+                lines {
+                  id
+                  quantity
+                }
+              }
+            }
+          }
+        `,
+        { code },
+      );
+      const { addFulfillmentToOrder } = await adminClient.query(
+        gql`
+          mutation ($input: FulfillOrderInput!) {
+            addFulfillmentToOrder(input: $input) {
+              ... on Fulfillment {
+                id
+              }
+              ... on ErrorResult {
+                message
+              }
+            }
+          }
+        `,
+        {
+          input: {
+            lines: orders.items[0].lines.map((l: { id: string; quantity: number }) => ({
+              orderLineId: l.id,
+              quantity: l.quantity,
+            })),
+            handler: {
+              code: "manual-fulfillment",
+              arguments: [
+                { name: "method", value: "Envío propio" },
+                { name: "trackingCode", value: "PROPIO-1" },
+              ],
+            },
+          },
+        },
+      );
+      await adminClient.query(
+        gql`
+          mutation ($id: ID!) {
+            simulateShipmentEvent(fulfillmentId: $id, event: "en_camino")
+          }
+        `,
+        { id: addFulfillmentToOrder.id },
+      );
+    } finally {
+      adminClient.setChannelToken(DEFAULT_TOKEN);
+    }
+  }
+
+  const myOrder = async (code: string) => {
+    shopClient.setChannelToken(DEFAULT_TOKEN);
+    const { sporaOrders } = await shopClient.query(gql`
+      query {
+        sporaOrders {
+          code
+          state
+          canConfirmDelivery
+          deliveryReport
+        }
+      }
+    `);
+    return sporaOrders.find((o: { code: string }) => o.code === code);
+  };
+
+  before(async () => {
+    await shopClient.asUserWithCredentials(rosa.emailAddress, rosa.password);
+  });
+
+  test("confirmación del cliente: un retiro en local pasa a entregado y su comisión a facturable", async () => {
+    const code = await placeOrder("Retiro en local");
+    assert.deepEqual(await myOrder(code), {
+      code,
+      state: "PaymentAuthorized",
+      canConfirmDelivery: true,
+      deliveryReport: null,
+    });
+    assert.equal((await shopClient.query(REPORT, { code, received: true })).reportOrderDelivery, true);
+    assert.deepEqual(await myOrder(code), {
+      code,
+      state: "Delivered",
+      canConfirmDelivery: false,
+      deliveryReport: "recibido",
+    });
+    const entry = await entryWhen(code, "facturable");
+    assert.equal(entry.billingMonth, month);
+    // Una sola vez.
+    await assert.rejects(shopClient.query(REPORT, { code, received: true }), /no espera confirmación/);
+  });
+
+  test("otro cliente no puede confirmar el pedido", async () => {
+    const code = await placeOrder("Envío a domicilio");
+    await ship(code);
+    shopClient.setChannelToken(DEFAULT_TOKEN);
+    await shopClient.query(
+      gql`
+        mutation ($input: RegisterCustomerInput!) {
+          registerCustomerAccount(input: $input) {
+            __typename
+          }
+        }
+      `,
+      { input: { emailAddress: "otro@correo.cr", firstName: "Otro", lastName: "Cliente", password: "clave-segura" } },
+    );
+    await shopClient.asUserWithCredentials("otro@correo.cr", "clave-segura");
+    try {
+      await assert.rejects(shopClient.query(REPORT, { code, received: true }), /not currently authorized/);
+      await assert.rejects(shopClient.query(REPORT, { code: "NO-EXISTE", received: true }), /not currently authorized/);
+    } finally {
+      await shopClient.asUserWithCredentials(rosa.emailAddress, rosa.password);
+    }
+    assert.deepEqual(await myOrder(code), { code, state: "Shipped", canConfirmDelivery: true, deliveryReport: null });
+
+    // "No lo recibí": en disputa; no se factura al cierre aunque ya tenga 10 días.
+    assert.equal((await shopClient.query(REPORT, { code, received: false })).reportOrderDelivery, true);
+    assert.deepEqual(await myOrder(code), {
+      code,
+      state: "Shipped",
+      canConfirmDelivery: false,
+      deliveryReport: "no-recibido",
+    });
+    await entryWhen(code, "en_disputa");
+    await entries().update({ orderCode: code }, { placedAt: new Date(Date.now() - 10 * 86_400_000) });
+    await adminClient.asSuperAdmin();
+    await adminClient.query(
+      gql`
+        mutation ($m: String!) {
+          closeCommissionMonth(month: $m) {
+            id
+          }
+        }
+      `,
+      { m: month },
+    );
+    assert.equal((await entries().findOneBy({ orderCode: code }))?.status, "en_disputa");
+  });
+
+  test("cierre: pendiente de hace 10 días sin entregar → facturado sin confirmar entrega; uno de hoy espera", async () => {
+    const old = await placeOrder("Envío a domicilio");
+    const recent = await placeOrder("Envío a domicilio");
+    await entryWhen(old, "pendiente");
+    await entryWhen(recent, "pendiente");
+    await entries().update({ orderCode: old }, { placedAt: new Date(Date.now() - 10 * 86_400_000) });
+
+    // El comercio ve desde cuándo se facturará cada uno al cierre.
+    const { commissionStatement } = await adminClient.query(
+      gql`
+        query ($m: String!) {
+          commissionStatement(month: $m) {
+            entries {
+              orderCode
+              autoBillableFrom
+            }
+          }
+        }
+      `,
+      { m: month },
+    );
+    const from = (code: string) =>
+      commissionStatement.entries.find((e: { orderCode: string }) => e.orderCode === code)?.autoBillableFrom;
+    const day = (offset: number) => businessDate(new Date(Date.now() + offset * 86_400_000));
+    assert.equal(from(old), day(-3));
+    assert.equal(from(recent), day(7));
+
+    await adminClient.query(
+      gql`
+        mutation ($m: String!) {
+          closeCommissionMonth(month: $m) {
+            id
+          }
+        }
+      `,
+      { m: month },
+    );
+    assert.partialDeepStrictEqual(await entries().findOneBy({ orderCode: old }), {
+      status: "facturado",
+      closedWithoutDelivery: true,
+      billingMonth: month,
+    });
+    assert.partialDeepStrictEqual(await entries().findOneBy({ orderCode: recent }), {
+      status: "pendiente",
+      closedWithoutDelivery: false,
+    });
   });
 });

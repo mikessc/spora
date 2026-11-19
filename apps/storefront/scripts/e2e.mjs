@@ -604,10 +604,14 @@ try {
   const delivered = movements.find((m) => m.includes(shippedOrder)) ?? "";
   assert.match(delivered.replace(/\s+/g, " "), /facturable.*₡5 752,21.*8 %.*₡460,18/); // gorra ₡6 500 con IVA → ₡5 752,21 sin IVA, al 8 %
   assert.match(await text(pc.locator("#totales")), /CRC/);
+  // Lo pendiente sin entrega confirmada, con la fecha desde la que el cierre lo factura igual.
+  assert.match(await text(pc.locator("#por-cierre tr").first()), /\d{1,2}\/\d{1,2}\/\d{4}.*₡/);
   const [download] = await Promise.all([pc.waitForEvent("download"), pc.click("#csv")]);
   assert.match(download.suggestedFilename(), /^comisiones-\d{4}-\d{2}\.csv$/);
   await panel.close();
-  ok("panel de comisiones: el comercio ve su pedido entregado como facturable (8 % sin IVA) y exporta el CSV");
+  ok(
+    "panel de comisiones: el comercio ve su pedido entregado como facturable (8 % sin IVA), lo que se facturará al cierre, y exporta el CSV",
+  );
 
   // El comercio edita su tienda en /panel/tienda (updateStoreSettings; ya no tiene updateChannel).
   const themePanel = await browser.newContext({ viewport });
@@ -738,6 +742,52 @@ try {
   });
   ok(
     `Voltio desde el marketplace: pedido ${voltioOrder} ($22, tarjeta y mensajería), entregado; comisión 5 % sin IVA = $0,80 facturable`,
+  );
+
+  // ── Correcciones post-MVP: "¿Recibiste tu pedido?" sin JS y pedidos en disputa en el panel de Spora ──────────────
+  const receiver = await browser.newContext({ javaScriptEnabled: false, viewport });
+  const pr = await receiver.newPage();
+  await pr.goto(`${STORE}/cuenta/ingresar`);
+  await pr.fill("#correo", mEmail);
+  await pr.fill("#clave", "clave-segura");
+  await pr.click(".form__submit");
+  await pr.waitForURL(`${STORE}/cuenta`);
+  const pickupOrder = async () => {
+    await buy(pr, STORE, "bolso-de-yute");
+    return checkout(pr, STORE, { shipping: "Retiro en local", address: { name: "Marta Solís", district: "10201" } });
+  };
+  const receivedOrder = await pickupOrder();
+  const disputedOrder = await pickupOrder();
+  await pr.goto(`${STORE}/cuenta`);
+  const question = (code) => pr.locator(".account__delivery", { hasText: code });
+  await question(receivedOrder).locator("button", { hasText: "Sí, lo recibí" }).click();
+  await pr.waitForURL(/entrega=recibido/);
+  assert.match(await text(pr.locator(".account__notice")), /entregado/);
+  assert.match(await text(pr.locator(".account__orders tbody tr", { hasText: receivedOrder }).first()), /Entregado/);
+  assert.equal(await question(receivedOrder).count(), 0);
+  await question(disputedOrder).locator("button", { hasText: "No lo recibí" }).click();
+  await pr.waitForURL(/entrega=disputa/);
+  assert.match(await text(question(disputedOrder)), /no recibió el pedido/);
+  await receiver.close();
+
+  const sporaPanel = await browser.newContext({ viewport });
+  const ps2 = await sporaPanel.newPage();
+  await ps2.goto("http://localhost:3000/panel/comisiones");
+  await ps2.evaluate(() =>
+    fetch("/admin-api", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        query: 'mutation { login(username: "superadmin", password: "superadmin") { __typename } }',
+      }),
+    }),
+  );
+  await ps2.reload();
+  await ps2.locator("#disputas tr", { hasText: disputedOrder }).waitFor();
+  await sporaPanel.close();
+  ok(
+    `¿Recibiste tu pedido? sin JS: ${receivedOrder} confirmado (entregado); ${disputedOrder} no recibido, en "Pedidos en disputa" del panel de Spora`,
   );
 } finally {
   await browser.close();

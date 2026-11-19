@@ -26,8 +26,10 @@ import {
   TransactionalConnection,
   VendurePlugin,
 } from "@vendure/core";
+import { canConfirmDelivery } from "@spora/shared";
 import gql from "graphql-tag";
 import { IsNull, Not } from "typeorm";
+import { isPickup } from "../shipping/shipping.plugin";
 
 declare module "@vendure/core/dist/entity/custom-entity-fields" {
   interface CustomAddressFields {
@@ -178,6 +180,8 @@ class AccountShopResolver {
       .innerJoin("customer.user", "user")
       .leftJoinAndSelect("order.channels", "channel")
       .leftJoinAndSelect("order.fulfillments", "fulfillment")
+      .leftJoinAndSelect("order.shippingLines", "shippingLine")
+      .leftJoinAndSelect("shippingLine.shippingMethod", "shippingMethod")
       .where("user.id = :userId", { userId: ctx.activeUserId })
       .andWhere({ orderPlacedAt: Not(IsNull()) })
       .orderBy("order.orderPlacedAt", "DESC")
@@ -205,6 +209,12 @@ class AccountShopResolver {
               }
             : null;
         })(),
+        canConfirmDelivery: canConfirmDelivery({
+          state: order.state,
+          pickup: isPickup(order),
+          report: order.customFields.customerDeliveryReport,
+        }),
+        deliveryReport: order.customFields.customerDeliveryReport,
       };
     });
   }
@@ -225,6 +235,10 @@ class AccountShopResolver {
         storeToken: String!
         storeName: String!
         shipment: SporaShipment
+        "Mostrar ¿Recibiste tu pedido? (reportOrderDelivery)."
+        canConfirmDelivery: Boolean!
+        "recibido o no-recibido (en disputa), si el cliente ya respondió."
+        deliveryReport: String
       }
       type SporaShipment {
         method: String!

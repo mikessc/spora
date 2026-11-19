@@ -102,6 +102,7 @@ class CommissionPanelController {
       }
       type CommissionEntry {
         id: ID!
+        orderId: ID!
         orderCode: String!
         storeName: String!
         status: String!
@@ -115,6 +116,10 @@ class CommissionPanelController {
         placedAt: DateTime!
         billableAt: DateTime
         billingMonth: String
+        "Facturado al cierre sin confirmar entrega (pasaron los días de gracia)."
+        closedWithoutDelivery: Boolean!
+        "Pendientes: día (AAAA-MM-DD, hora de CR) desde el que se facturan al cierre si no se entregan ni cancelan."
+        autoBillableFrom: String
       }
       type CommissionTotal {
         currency: String!
@@ -122,6 +127,7 @@ class CommissionPanelController {
         facturable: Money!
         facturado: Money!
         anulado: Money!
+        en_disputa: Money!
       }
       type CommissionStatement {
         month: String!
@@ -146,7 +152,7 @@ class CommissionPanelController {
       }
       extend type Mutation {
         createCommissionAgreement(sellerId: ID!, percentage: String!, validFrom: String!): CommissionAgreement!
-        "Cierra el mes: agrupa lo facturable por comercio y moneda y lo marca facturado."
+        "Cierra el mes: lo pendiente con los días de gracia cumplidos pasa a facturable; después agrupa lo facturable por comercio y moneda y lo marca facturado."
         closeCommissionMonth(month: String!): [CommissionInvoice!]!
       }
     `,

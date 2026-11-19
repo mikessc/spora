@@ -424,6 +424,26 @@ a {
   text-align: left;
   border-bottom: 1px solid var(--sp-color-border);
 }
+.account__delivery td {
+  background: var(--sp-color-surface);
+}
+.account__delivery-question {
+  margin: 0 0 calc(var(--sp-space) / 2);
+  font-weight: var(--sp-heading-weight);
+}
+.account__delivery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--sp-space) / 2);
+}
+.account__delivery-form {
+  margin: 0;
+}
+.account__notice {
+  padding: calc(var(--sp-space) / 2) var(--sp-space);
+  border: 1px solid var(--sp-color-border);
+  border-radius: var(--sp-radius);
+}
 .checkout__steps {
   display: flex;
   gap: var(--sp-space);

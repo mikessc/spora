@@ -16,7 +16,17 @@ import {
 import { DEFAULT_CHANNEL_CODE } from "@vendure/common/lib/shared-constants";
 import { businessDate, type CurrencyCode } from "@spora/shared";
 import { Column, Entity, In, IsNull } from "typeorm";
-import { agreementOn, billingMonth, commissionAmount, commissionBase, percentageBasisPoints } from "./rules";
+import { DeliveryDisputeEvent } from "../shipping/events";
+import {
+  agreementOn,
+  billableAtCloseFrom,
+  billedAtClose,
+  billingMonth,
+  closingGraceDays,
+  commissionAmount,
+  commissionBase,
+  percentageBasisPoints,
+} from "./rules";
 
 /** Porcentaje negociado con un comercio, desde un día de negocio (PLAN §5). Renegociar = un acuerdo nuevo. */
 @Entity()
@@ -29,7 +39,7 @@ export class CommissionAgreement extends VendureEntity {
   @Column("varchar") validFrom!: string;
 }
 
-export type CommissionStatus = "pendiente" | "facturable" | "facturado" | "anulado";
+export type CommissionStatus = "pendiente" | "facturable" | "facturado" | "anulado" | "en_disputa";
 
 /** Una línea por pedido, con copia del porcentaje vigente: renegociar no cambia pedidos pasados. */
 @Entity()
@@ -56,6 +66,8 @@ export class CommissionEntry extends VendureEntity {
   /** Mes en que se factura (`YYYY-MM`, hora de Costa Rica): el de la entrega. */
   @Column("varchar", { nullable: true }) billingMonth!: string | null;
   @Column("int", { nullable: true }) invoiceId!: number | null;
+  /** Facturado al cierre sin confirmar entrega (pasaron los días de gracia sin entregarse ni cancelarse). */
+  @Column("boolean", { default: false }) closedWithoutDelivery!: boolean;
 }
 
 /** Estado de cuenta mensual de un comercio en una moneda (no es la factura electrónica de Hacienda: fuera del MVP). */
@@ -88,6 +100,9 @@ export class CommissionService implements OnApplicationBootstrap {
       if (e.toState === "Delivered") safely("entrega", () => this.onDelivered(e.ctx, e.order.id, new Date()));
       if (e.toState === "Cancelled") safely("cancelación", () => this.onCancelled(e.ctx, e.order.id));
     });
+    this.events
+      .ofType(DeliveryDisputeEvent)
+      .subscribe((e) => safely("disputa", () => this.onDisputed(e.ctx, e.orderId)));
   }
 
   async agreements(ctx: RequestContext, sellerId: ID) {
@@ -157,7 +172,18 @@ export class CommissionService implements OnApplicationBootstrap {
   async onCancelled(ctx: RequestContext, orderId: ID) {
     await this.connection
       .getRepository(ctx, CommissionEntry)
-      .update({ orderId: Number(orderId), status: In(["pendiente", "facturable"]) }, { status: "anulado" });
+      .update(
+        { orderId: Number(orderId), status: In(["pendiente", "facturable", "en_disputa"]) },
+        { status: "anulado" },
+      );
+  }
+
+  /** El cliente dice que no lo recibió: no se factura (ni al cierre) hasta que el admin de Spora lo resuelva. */
+  async onDisputed(ctx: RequestContext, orderId: ID) {
+    await this.onPlaced(ctx, orderId);
+    await this.connection
+      .getRepository(ctx, CommissionEntry)
+      .update({ orderId: Number(orderId), status: "pendiente" }, { status: "en_disputa" });
   }
 
   /**
@@ -171,6 +197,7 @@ export class CommissionService implements OnApplicationBootstrap {
       where: [
         { ...where, billingMonth: month },
         { ...where, status: "pendiente" },
+        { ...where, status: "en_disputa" },
         { ...where, status: "anulado", billingMonth: IsNull() },
       ],
       order: { placedAt: "DESC" },
@@ -178,23 +205,56 @@ export class CommissionService implements OnApplicationBootstrap {
     const visible = entries.filter((e) => e.status !== "anulado" || billingMonth(e.placedAt) === month);
     const totals = new Map<string, Record<CommissionStatus, number>>();
     for (const e of visible) {
-      const t = totals.get(e.currency) ?? { pendiente: 0, facturable: 0, facturado: 0, anulado: 0 };
+      const t = totals.get(e.currency) ?? { pendiente: 0, facturable: 0, facturado: 0, anulado: 0, en_disputa: 0 };
       t[e.status] += e.amount;
       totals.set(e.currency, t);
     }
     const seller = sellerId ? await this.connection.getRepository(ctx, Seller).findOneBy({ id: sellerId }) : null;
+    const grace = closingGraceDays();
     return {
       month,
       sellerId,
       sellerName: seller?.name ?? null,
       totals: [...totals].map(([currency, t]) => ({ currency, ...t })),
-      entries: visible,
+      // Para que el comercio vea qué se facturará al cierre si no lo entrega (o cancela) antes.
+      entries: visible.map((e) => ({
+        ...e,
+        autoBillableFrom: e.status === "pendiente" ? billableAtCloseFrom(e.placedAt, grace) : null,
+      })),
     };
   }
 
-  /** Cierra el mes: agrupa lo facturable por comercio y moneda en un estado de cuenta y lo marca facturado. */
-  async closeMonth(ctx: RequestContext, month: string) {
+  /**
+   * Cierra el mes. Primero, lo pendiente con los días de gracia cumplidos (y sin cancelar ni en disputa) pasa a
+   * facturable con la marca "facturado al cierre sin confirmar entrega". Después, todo lo facturable se agrupa por
+   * comercio y moneda en un estado de cuenta y se marca facturado.
+   */
+  async closeMonth(ctx: RequestContext, month: string, now = new Date()) {
     if (!MONTH.test(month)) throw new UserInputError("El mes debe ser AAAA-MM");
+    const repo = this.connection.getRepository(ctx, CommissionEntry);
+    const grace = closingGraceDays();
+    const due = (await repo.find({ where: { status: "pendiente", invoiceId: IsNull() } })).filter((e) =>
+      billedAtClose(e, month, now, grace),
+    );
+    if (due.length) {
+      // Por si el evento de cancelación o de disputa todavía no llegó al movimiento.
+      const ids = due.map((e) => e.orderId);
+      const blocked = await this.connection.getRepository(ctx, Order).find({
+        select: { id: true },
+        where: [
+          { id: In(ids), state: "Cancelled" },
+          { id: In(ids), customFields: { customerDeliveryReport: "no-recibido" } },
+        ],
+      });
+      const skip = new Set(blocked.map((o) => Number(o.id)));
+      const billable = due.filter((e) => !skip.has(e.orderId)).map((e) => e.id);
+      if (billable.length) {
+        await repo.update(
+          { id: In(billable) },
+          { status: "facturable", billableAt: now, billingMonth: month, closedWithoutDelivery: true },
+        );
+      }
+    }
     const entries = await this.connection
       .getRepository(ctx, CommissionEntry)
       .find({ where: { billingMonth: month, status: "facturable", invoiceId: IsNull() } });

@@ -34,6 +34,39 @@ export function commissionBase(subTotal: Money, chargedIn: CurrencyCode, rate: s
   return convertMoney(subTotal, chargedIn, rate);
 }
 
+/** Días de gracia del cierre de mes (`SPORA_DIAS_GRACIA_CIERRE`, 7 por defecto). */
+export function closingGraceDays(env: Record<string, string | undefined> = process.env): number {
+  const days = Number(env.SPORA_DIAS_GRACIA_CIERRE ?? "7");
+  if (!Number.isInteger(days) || days < 0)
+    throw new Error(`SPORA_DIAS_GRACIA_CIERRE inválido: "${env.SPORA_DIAS_GRACIA_CIERRE}"`);
+  return days;
+}
+
+const addDays = (day: string, days: number) =>
+  new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+/** Día de negocio (hora de CR) desde el que un pedido sin entrega confirmada se factura al cerrar el mes. */
+export const billableAtCloseFrom = (placedAt: Date, graceDays: number): string =>
+  addDays(businessDate(placedAt), graceDays);
+
+/**
+ * ¿Se factura este movimiento al cerrar `month` el día `closingAt`, aunque nadie haya confirmado la entrega? Solo los
+ * pendientes (no los cancelados ni los en disputa), hechos en ese mes o antes y con al menos `graceDays` días al
+ * cierre (hora de CR). Los más nuevos esperan al cierre siguiente.
+ */
+export function billedAtClose(
+  entry: { status: string; placedAt: Date },
+  month: string,
+  closingAt: Date,
+  graceDays: number,
+): boolean {
+  return (
+    entry.status === "pendiente" &&
+    billingMonth(entry.placedAt) <= month &&
+    billableAtCloseFrom(entry.placedAt, graceDays) <= businessDate(closingAt)
+  );
+}
+
 /** Monto de la comisión en la unidad menor, redondeado al entero más cercano. */
 export const commissionAmount = (base: Money, percentage: string): Money => ({
   amount: Math.round((base.amount * percentageBasisPoints(percentage)) / 10_000),

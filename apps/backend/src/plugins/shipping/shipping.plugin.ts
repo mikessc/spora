@@ -1,13 +1,18 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { Controller, Headers, HttpCode, Inject, Injectable, Param, Post, Req, Res } from "@nestjs/common";
 import { Args, Mutation, Resolver } from "@nestjs/graphql";
+import { DEFAULT_CHANNEL_CODE } from "@vendure/common/lib/shared-constants";
 import {
   Allow,
   Channel,
   Ctx,
   type DeepPartial,
+  EventBus,
+  ForbiddenError,
   Fulfillment,
+  idsAreEqual,
   LanguageCode,
+  manualFulfillmentHandler,
   Order,
   type OrderProcess,
   OrderService,
@@ -32,7 +37,9 @@ import {
   type InsertEvent,
   type UpdateEvent,
 } from "typeorm";
+import { canConfirmDelivery, type DeliveryReport } from "@spora/shared";
 import { decrypt, encrypt } from "../payments/secrets";
+import { DeliveryDisputeEvent } from "./events";
 import { correosCalculator, correosFulfillment, trackingAppFulfillment, zoneRateCalculator } from "./providers";
 
 declare module "@vendure/core/dist/entity/custom-entity-fields" {
@@ -48,6 +55,9 @@ declare module "@vendure/core/dist/entity/custom-entity-fields" {
   interface CustomChannelFields {
     trackingAppKey: string | null;
     trackingAppWebhookSecret: string | null;
+  }
+  interface CustomOrderFields {
+    customerDeliveryReport: DeliveryReport | null;
   }
 }
 
@@ -167,6 +177,97 @@ export class ShipmentEventsService {
       }
     }
     return "aplicado";
+  }
+}
+
+/**
+ * El cliente responde "¿Recibiste tu pedido?" desde su Cuenta Spora (solo el dueño del pedido). Sí: el pedido pasa a
+ * entregado por el mismo servicio que usan el Admin UI y los webhooks (un retiro sin guía recibe una). No: queda en
+ * disputa y su comisión no se factura.
+ */
+@Injectable()
+export class DeliveryReportService {
+  constructor(
+    @Inject(TransactionalConnection) private connection: TransactionalConnection,
+    @Inject(RequestContextService) private contexts: RequestContextService,
+    @Inject(OrderService) private orders: OrderService,
+    @Inject(ShipmentEventsService) private shipments: ShipmentEventsService,
+    @Inject(EventBus) private events: EventBus,
+  ) {}
+
+  async report(ctx: RequestContext, orderCode: string, received: boolean) {
+    const order = ctx.activeUserId
+      ? await this.connection.rawConnection.getRepository(Order).findOne({
+          where: { code: orderCode },
+          relations: {
+            customer: { user: true },
+            channels: true,
+            lines: true,
+            fulfillments: true,
+            shippingLines: { shippingMethod: true },
+          },
+        })
+      : null;
+    // Mismo error si no existe o es de otro: no se revela qué pedidos existen.
+    if (!order?.customer?.user || !idsAreEqual(order.customer.user.id, ctx.activeUserId!)) throw new ForbiddenError();
+    const pickup = isPickup(order);
+    if (!canConfirmDelivery({ state: order.state, pickup, report: order.customFields.customerDeliveryReport })) {
+      throw new UserInputError("Este pedido no espera confirmación de entrega");
+    }
+    const store = order.channels.find((c) => c.code !== DEFAULT_CHANNEL_CODE)!;
+    const storeCtx = await this.contexts.create({ apiType: "admin", channelOrToken: store.token });
+    await this.connection.withTransaction(storeCtx, async (tx) => {
+      const report: DeliveryReport = received ? "recibido" : "no-recibido";
+      await this.connection
+        .getRepository(tx, Order)
+        .update({ id: order.id }, { customFields: { customerDeliveryReport: report } } as never);
+      if (!received) {
+        await this.events.publish(new DeliveryDisputeEvent(tx, order.id));
+        return;
+      }
+      let fulfillment = order.fulfillments.find((f) => f.state !== "Cancelled");
+      if (!fulfillment) {
+        const created = await this.orders.createFulfillment(tx, {
+          lines: order.lines.map((l) => ({ orderLineId: l.id, quantity: l.quantity })),
+          handler: {
+            code: manualFulfillmentHandler.code,
+            arguments: [
+              { name: "method", value: pickup ? "Retiro en local" : "Entrega" },
+              { name: "trackingCode", value: "" },
+            ],
+          },
+        });
+        if (!("id" in created)) throw new UserInputError(created.message);
+        fulfillment = created;
+      }
+      // Idempotente por pedido: el cliente confirma una sola vez.
+      await this.shipments.apply(tx, {
+        provider: "cliente",
+        eventId: `entrega-${order.id}`,
+        kind: "entregado",
+        status: "Recibido por el cliente",
+        fulfillmentId: fulfillment.id,
+      });
+    });
+    return true;
+  }
+}
+
+/** Retiro en local: el método `<tienda>-retiro` que crea toda tienda. */
+export const isPickup = (order: Order) => order.shippingLines.some((l) => l.shippingMethod?.code.endsWith("-retiro"));
+
+@Resolver()
+class DeliveryShopResolver {
+  constructor(@Inject(DeliveryReportService) private reports: DeliveryReportService) {}
+
+  @Mutation()
+  @Allow(Permission.Owner)
+  reportOrderDelivery(
+    @Ctx() ctx: RequestContext,
+    @Args("orderCode") orderCode: string,
+    @Args("received") received: boolean,
+  ) {
+    return this.reports.report(ctx, orderCode, received);
   }
 }
 
@@ -335,8 +436,17 @@ class ShippingAdminResolver {
 @VendurePlugin({
   imports: [PluginCommonModule],
   entities: [ShipmentEvent],
-  providers: [ShipmentEventsService],
+  providers: [ShipmentEventsService, DeliveryReportService],
   controllers: [TrackingAppWebhookController],
+  shopApiExtensions: {
+    schema: gql`
+      extend type Mutation {
+        "El dueño del pedido responde ¿Recibiste tu pedido?: true lo marca entregado; false lo deja en disputa."
+        reportOrderDelivery(orderCode: String!, received: Boolean!): Boolean!
+      }
+    `,
+    resolvers: [DeliveryShopResolver],
+  },
   adminApiExtensions: {
     schema: gql`
       extend type Mutation {
@@ -387,6 +497,14 @@ class ShippingAdminResolver {
       { name: "trackingUrl", type: "string", nullable: true, readonly: true, label: es("Enlace de rastreo") },
       { name: "trackingStatus", type: "string", nullable: true, readonly: true, label: es("Estado del rastreo") },
     );
+    config.customFields.Order.push({
+      name: "customerDeliveryReport",
+      type: "string",
+      nullable: true,
+      readonly: true,
+      label: es("Entrega según el cliente"),
+      description: es("recibido o no-recibido (en disputa), desde la Cuenta Spora."),
+    });
     config.customFields.ProductVariant.push({
       name: "weightGrams",
       type: "int",
