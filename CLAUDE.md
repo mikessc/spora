@@ -1,6 +1,7 @@
 # Spora — marketplace de tiendas para pymes
 
-Tiendas gratis para pymes de Costa Rica; Spora gana por comisión. Plan: [docs/PLAN.md](docs/PLAN.md). Estado:
+Tiendas gratis para pymes de Costa Rica; Spora gana por comisión. Plan: [docs/PLAN.md](docs/PLAN.md). Ejecución del
+MVP: [docs/MVP.md](docs/MVP.md) (manda sobre el orden de trabajo). Estado:
 [docs/PROGRESO.md](docs/PROGRESO.md). Decisiones: [docs/adr/](docs/adr/).
 
 ## Stack
