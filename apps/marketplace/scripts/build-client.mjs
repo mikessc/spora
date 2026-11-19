@@ -1,5 +1,6 @@
 // JS del navegador (solo las islas). `--watch` lo recompila al guardar; `--serve` además levanta el servidor
-// (`pnpm dev`). Un solo proceso Node en vez de `&`, que en Windows no corre en paralelo.
+// (`pnpm dev`). Un solo proceso Node en vez de `&`, que en Windows no corre en paralelo. `node --watch` y no
+// `tsx watch`: bajo turbo en Windows `tsx watch` no llega a levantar el servidor.
 import { spawn } from "node:child_process";
 import { context } from "esbuild";
 
@@ -17,7 +18,8 @@ const ctx = await context({
 if (process.argv.includes("--watch")) {
   await ctx.rebuild();
   await ctx.watch();
-  if (process.argv.includes("--serve")) spawn("tsx", ["watch", "src/server.ts"], { stdio: "inherit", shell: true });
+  if (process.argv.includes("--serve"))
+    spawn(process.execPath, ["--watch", "--import", "tsx", "src/server.ts"], { stdio: "inherit" });
 } else {
   await ctx.rebuild();
   await ctx.dispose();

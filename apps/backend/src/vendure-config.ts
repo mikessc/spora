@@ -19,6 +19,8 @@ const env = (name: string, devDefault: string): string => {
   if (process.env.NODE_ENV === "production") throw new Error(`Falta la variable de entorno ${name}`);
   return devDefault;
 };
+// Telemetría anónima de Vendure apagada también sin .env (un clon recién hecho no tiene .env).
+process.env.VENDURE_DISABLE_TELEMETRY ??= "true";
 
 export const config: VendureConfig = {
   apiOptions: {
