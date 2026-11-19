@@ -1,0 +1,9 @@
+# Los docs los escribe Mike a mano; Prettier no los reformatea.
+*.md
+pnpm-lock.yaml
+node_modules
+dist
+.turbo
+apps/backend/static
+apps/backend/src/migrations
+apps/storefront/public/cliente.js

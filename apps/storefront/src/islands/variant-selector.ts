@@ -30,7 +30,9 @@ export function VariantSelector({ optionGroups, variants, initialVariantId }: Va
   function choose(groupId: string, optionId: string) {
     setSelected({ ...selected(), [groupId]: optionId });
     const v = variant();
-    emitVariant(v ? { id: v.id, featuredAssetId: v.featuredAssetId, available: v.stockLevel !== "OUT_OF_STOCK" } : null);
+    emitVariant(
+      v ? { id: v.id, featuredAssetId: v.featuredAssetId, available: v.stockLevel !== "OUT_OF_STOCK" } : null,
+    );
   }
 
   /** ¿Esta opción, con el resto de la selección actual, lleva a una variante agotada o inexistente? */

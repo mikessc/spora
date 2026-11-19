@@ -1,0 +1,28 @@
+name: spora
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: spora
+      POSTGRES_PASSWORD: spora
+      POSTGRES_DB: spora
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spora"]
+      interval: 2s
+      retries: 30
+  meilisearch:
+    image: getmeili/meilisearch:v1.15
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-solo-desarrollo-meili}
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "7700:7700"
+    volumes:
+      - meili:/meili_data
+volumes:
+  pgdata:
+  meili:

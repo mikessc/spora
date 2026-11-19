@@ -2,5 +2,4 @@
 export const designStyles = ["suave", "minimal"] as const;
 export type DesignStyle = (typeof designStyles)[number];
 
-export const isDesignStyle = (value: unknown): value is DesignStyle =>
-  designStyles.includes(value as DesignStyle);
+export const isDesignStyle = (value: unknown): value is DesignStyle => designStyles.includes(value as DesignStyle);

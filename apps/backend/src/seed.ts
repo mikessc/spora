@@ -39,7 +39,10 @@ try {
     const requestContexts = app.get(RequestContextService);
     const superadmin = await app
       .get(UserService)
-      .getUserByEmailAddress(await requestContexts.create({ apiType: "admin" }), config.authOptions.superadminCredentials!.identifier);
+      .getUserByEmailAddress(
+        await requestContexts.create({ apiType: "admin" }),
+        config.authOptions.superadminCredentials!.identifier,
+      );
     const ctx = await requestContexts.create({ apiType: "admin", user: superadmin });
     await app.get(GlobalSettingsService).updateSettings(ctx, {
       availableLanguages: [LanguageCode.es, LanguageCode.en],

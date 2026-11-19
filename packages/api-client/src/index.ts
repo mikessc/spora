@@ -56,25 +56,59 @@ export interface ShopClientOptions {
 const PRODUCT_QUERY = /* GraphQL */ `
   query Product($slug: String!) {
     product(slug: $slug) {
-      id name slug description
-      assets { id preview width height }
-      optionGroups { id name options { id name } }
+      id
+      name
+      slug
+      description
+      assets {
+        id
+        preview
+        width
+        height
+      }
+      optionGroups {
+        id
+        name
+        options {
+          id
+          name
+        }
+      }
       variants {
-        id sku name priceWithTax currencyCode stockLevel
-        featuredAsset { id }
-        options { id }
+        id
+        sku
+        name
+        priceWithTax
+        currencyCode
+        stockLevel
+        featuredAsset {
+          id
+        }
+        options {
+          id
+        }
       }
     }
-  }`;
+  }
+`;
 
 const ADD_ITEM_MUTATION = /* GraphQL */ `
   mutation AddItem($variantId: ID!, $quantity: Int!) {
     addItemToOrder(productVariantId: $variantId, quantity: $quantity) {
       __typename
-      ... on Order { code totalQuantity totalWithTax currencyCode }
-      ... on ErrorResult { errorCode message }
+      ... on Order {
+        code
+        totalQuantity
+        totalWithTax
+        currencyCode
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
     }
-  }`;
+  }
+`;
 
 interface RawVariant {
   id: string;
@@ -98,10 +132,16 @@ export function createShopClient({ url, channelToken }: ShopClientOptions) {
   async function request<T>(query: string, variables: Record<string, unknown>): Promise<T> {
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (channelToken) headers["vendure-token"] = channelToken;
-    const res = await fetch(url, { method: "POST", headers, credentials: "same-origin", body: JSON.stringify({ query, variables }) });
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      credentials: "same-origin",
+      body: JSON.stringify({ query, variables }),
+    });
     if (!res.ok) throw new ShopApiError(`Shop API respondió ${res.status}`);
     const body = (await res.json()) as { data?: T; errors?: { message: string }[] };
-    if (body.errors?.length || !body.data) throw new ShopApiError(body.errors?.map((e) => e.message).join("; ") ?? "Respuesta vacía");
+    if (body.errors?.length || !body.data)
+      throw new ShopApiError(body.errors?.map((e) => e.message).join("; ") ?? "Respuesta vacía");
     return body.data;
   }
 
@@ -126,9 +166,17 @@ export function createShopClient({ url, channelToken }: ShopClientOptions) {
     },
 
     async addItemToOrder(variantId: string, quantity = 1): Promise<CartSummary> {
-      const { addItemToOrder: r } = await request<{ addItemToOrder: RawAddItem }>(ADD_ITEM_MUTATION, { variantId, quantity });
-      if (!("code" in r) || r.__typename !== "Order") throw new ShopApiError("message" in r ? r.message : "No se pudo agregar");
-      return { code: r.code, totalQuantity: r.totalQuantity, total: { amount: r.totalWithTax, currency: r.currencyCode } };
+      const { addItemToOrder: r } = await request<{ addItemToOrder: RawAddItem }>(ADD_ITEM_MUTATION, {
+        variantId,
+        quantity,
+      });
+      if (!("code" in r) || r.__typename !== "Order")
+        throw new ShopApiError("message" in r ? r.message : "No se pudo agregar");
+      return {
+        code: r.code,
+        totalQuantity: r.totalQuantity,
+        total: { amount: r.totalWithTax, currency: r.currencyCode },
+      };
     },
   };
 }

@@ -83,7 +83,10 @@ try {
   );
 
   // Las islas funcionan y se coordinan.
-  await p2.locator(".variants__option").filter({ hasText: /^Azul$/ }).click();
+  await p2
+    .locator(".variants__option")
+    .filter({ hasText: /^Azul$/ })
+    .click();
   assert.match((await p2.locator(".gallery__image").getAttribute("src")) ?? "", /azul-frente/);
   await p2.locator(".variants__option").filter({ hasText: /^L$/ }).click();
   assert.equal(await text(p2.locator(".variants__price")), "₡13 500");

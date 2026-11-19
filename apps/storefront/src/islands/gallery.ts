@@ -9,7 +9,12 @@ export interface GalleryProps {
 }
 
 export function Gallery({ productName, assets, initialAssetId }: GalleryProps) {
-  const [index, setIndex] = signal(Math.max(0, assets.findIndex((a) => a.id === initialAssetId)));
+  const [index, setIndex] = signal(
+    Math.max(
+      0,
+      assets.findIndex((a) => a.id === initialAssetId),
+    ),
+  );
   const current = () => assets[index()];
 
   const root = div("gallery", [

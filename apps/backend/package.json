@@ -3,11 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "db": "docker compose up -d --wait",
-    "db:reset": "docker compose down -v && rimraf static && docker compose up -d --wait",
     "seed": "tsx src/seed.ts",
     "dev": "tsx src/index.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@vendure/asset-server-plugin": "3.8.2",

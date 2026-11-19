@@ -2,14 +2,29 @@
   "name": "spora",
   "private": true,
   "packageManager": "pnpm@9.12.0",
-  "engines": { "node": ">=22.3.0" },
+  "engines": {
+    "node": ">=22.3.0"
+  },
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "typecheck": "turbo run typecheck"
+    "seed": "pnpm --filter @spora/backend seed",
+    "check": "prettier --check . && turbo run typecheck test && eslint .",
+    "format": "prettier --write .",
+    "e2e": "pnpm --filter @spora/storefront e2e",
+    "db": "docker compose up -d --wait",
+    "db:reset": "docker compose down -v && rimraf apps/backend/static && docker compose up -d --wait"
   },
   "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "eslint": "^9.36.0",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.0",
     "turbo": "^2.5.0",
-    "typescript": "^5.9.0"
-  }
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.44.0",
+    "vitest": "^3.2.0",
+    "rimraf": "^6.0.0"
+  },
+  "type": "module"
 }

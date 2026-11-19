@@ -16,8 +16,14 @@ const app = new Hono();
 
 // Rutas relativas a apps/storefront (los scripts de pnpm corren ahí).
 app.use("/static/*", serveStatic({ root: "./public", rewriteRequestPath: (p) => p.replace(/^\/static/, "") }));
-app.use("/temas/*", serveStatic({ root: "../../packages/themes", rewriteRequestPath: (p) => p.replace(/^\/temas/, "") }));
-app.use("/vendor/*", serveStatic({ root: "./node_modules/sibujs-ui/dist", rewriteRequestPath: (p) => p.replace(/^\/vendor/, "") }));
+app.use(
+  "/temas/*",
+  serveStatic({ root: "../../packages/themes", rewriteRequestPath: (p) => p.replace(/^\/temas/, "") }),
+);
+app.use(
+  "/vendor/*",
+  serveStatic({ root: "./node_modules/sibujs-ui/dist", rewriteRequestPath: (p) => p.replace(/^\/vendor/, "") }),
+);
 
 // Proxy a la Shop API: el navegador nunca habla directo con Vendure ni elige el canal.
 app.post("/shop-api", async (c) => {
@@ -36,8 +42,7 @@ app.post("/shop-api", async (c) => {
   return new Response(res.body, { status: res.status, headers });
 });
 
-const escapeHtml = (s: string) =>
-  s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
 function documentHtml(product: Product, style: DesignStyle, body: string) {
   return `<!doctype html>

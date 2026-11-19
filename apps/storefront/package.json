@@ -8,7 +8,8 @@
     "dev": "pnpm build:client && tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "check": "node scripts/check-fase0.mjs"
+    "e2e": "node scripts/check-fase0.mjs",
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.0",
