@@ -13,13 +13,14 @@ import { CurrencyPlugin } from "./currency/currency.plugin";
 import { sign } from "./payments/gateways";
 import { PaymentsPlugin } from "./payments/payments.plugin";
 import { SellersPlugin } from "./sellers/sellers.plugin";
+import { ShippingPlugin, signTrackingAppWebhook } from "./shipping/shipping.plugin";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 registerInitializer("sqljs", new SqljsInitializer(path.join(dir, "../../__data__")));
 
 process.env.BCCR_SIMULATED_RATE = "515.25";
 const config = mergeConfig(testConfig, {
-  plugins: [SellersPlugin, CatalogPlugin, CurrencyPlugin, AccountPlugin, PaymentsPlugin],
+  plugins: [SellersPlugin, CatalogPlugin, CurrencyPlugin, AccountPlugin, PaymentsPlugin, ShippingPlugin],
   paymentOptions: { paymentMethodHandlers: [] },
   authOptions: { requireVerification: false },
 });
@@ -702,5 +703,211 @@ describe("pagos (M4)", () => {
     const again = await complete(second.code, approved);
     assert.equal(again.state, "PaymentSettled");
     assert.equal(again.payments.filter((p: { state: string }) => p.state === "Settled").length, 1);
+  });
+});
+
+describe("envíos (M5)", () => {
+  const DEFAULT_TOKEN = testConfig.defaultChannelToken ?? "e2e-default-channel";
+  const RESULT = `__typename ... on Order { code state } ... on ErrorResult { errorCode message }`;
+  const webhookUrl = `http://localhost:${config.apiOptions.port}/webhooks/trackingapp`;
+  let fulfillment: { id: string; customFields: { externalId: string } };
+  let orderId: string;
+
+  const postWebhook = (token: string, payload: object, eventId: string, secret = "whsec_cafe") => {
+    const body = JSON.stringify(payload);
+    return fetch(`${webhookUrl}/${token}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-tracking-signature": signTrackingAppWebhook(body, secret),
+        "x-tracking-event": (payload as { type: string }).type,
+        "x-tracking-event-id": eventId,
+      },
+      body,
+    });
+  };
+  const delivered = () => ({
+    id: "evento-1",
+    type: "package.delivered",
+    data: { package: { id: fulfillment.customFields.externalId, trackingNumber: "x", status: "entregado" } },
+  });
+
+  before(async () => {
+    // Café Sur con TrackingApp: secreto del webhook y un método de envío que crea la guía allá.
+    await adminClient.asSuperAdmin();
+    adminClient.setChannelToken("cafe-sur");
+    const { activeChannel } = await adminClient.query(gql`
+      query {
+        activeChannel {
+          id
+        }
+      }
+    `);
+    await adminClient.query(
+      gql`
+        mutation ($id: ID!) {
+          updateChannel(input: { id: $id, customFields: { trackingAppWebhookSecret: "whsec_cafe" } }) {
+            __typename
+          }
+        }
+      `,
+      { id: activeChannel.id },
+    );
+    await adminClient.query(gql`
+      mutation {
+        createShippingMethod(
+          input: {
+            code: "cafe-sur-mensajeria"
+            fulfillmentHandler: "trackingapp"
+            checker: { code: "default-shipping-eligibility-checker", arguments: [{ name: "orderMinimum", value: "0" }] }
+            calculator: {
+              code: "default-shipping-calculator"
+              arguments: [
+                { name: "rate", value: "400" }
+                { name: "includesTax", value: "include" }
+                { name: "taxRate", value: "0" }
+              ]
+            }
+            translations: [{ languageCode: es, name: "Mensajería", description: "" }]
+          }
+        ) {
+          id
+        }
+      }
+    `);
+
+    // Un pedido con contra entrega, enviado por TrackingApp (simulado).
+    shopClient.setChannelToken("cafe-sur");
+    const { product } = await shopClient.query(gql`
+      query {
+        product(slug: "cafe-500") {
+          variants {
+            id
+          }
+        }
+      }
+    `);
+    await shopClient.query(
+      gql`mutation ($id: ID!) { addItemToOrder(productVariantId: $id, quantity: 1) { ${RESULT} } }`,
+      { id: product.variants[0].id },
+    );
+    await shopClient.query(
+      gql`mutation ($input: CreateAddressInput!) { setOrderShippingAddress(input: $input) { ${RESULT} } }`,
+      {
+        input: {
+          fullName: "Rosa",
+          streetLine1: "Casa 1",
+          city: "Escazú",
+          province: "San José",
+          postalCode: "10201",
+          countryCode: "CR",
+        },
+      },
+    );
+    const { eligibleShippingMethods } = await shopClient.query(gql`
+      query {
+        eligibleShippingMethods {
+          id
+          name
+        }
+      }
+    `);
+    const courier = eligibleShippingMethods.find((m: { name: string }) => m.name === "Mensajería");
+    await shopClient.query(
+      gql`mutation ($id: [ID!]!) { setOrderShippingMethod(shippingMethodId: $id) { ${RESULT} } }`,
+      {
+        id: [courier.id],
+      },
+    );
+    await shopClient.query(gql`mutation { transitionOrderToState(state: "ArrangingPayment") { ${RESULT} } }`);
+    const { addPaymentToOrder: order } = await shopClient.query(
+      gql`mutation { addPaymentToOrder(input: { method: "cafe-sur-contra-entrega", metadata: {} }) { ${RESULT} } }`,
+    );
+    const { orders } = await adminClient.query(
+      gql`
+        query ($code: String!) {
+          orders(options: { filter: { code: { eq: $code } } }) {
+            items {
+              id
+              lines {
+                id
+                quantity
+              }
+            }
+          }
+        }
+      `,
+      { code: order.code },
+    );
+    orderId = orders.items[0].id;
+    const { addFulfillmentToOrder } = await adminClient.query(
+      gql`
+        mutation ($input: FulfillOrderInput!) {
+          addFulfillmentToOrder(input: $input) {
+            ... on Fulfillment {
+              id
+              customFields {
+                externalId
+              }
+            }
+            ... on ErrorResult {
+              message
+            }
+          }
+        }
+      `,
+      {
+        input: {
+          lines: orders.items[0].lines.map((l: { id: string; quantity: number }) => ({
+            orderLineId: l.id,
+            quantity: l.quantity,
+          })),
+          handler: { code: "trackingapp", arguments: [] },
+        },
+      },
+    );
+    fulfillment = addFulfillmentToOrder;
+    adminClient.setChannelToken(DEFAULT_TOKEN);
+  });
+
+  test("webhook firmado: entrega el pedido y liquida la contra entrega; repetido no hace nada", async () => {
+    assert.ok(fulfillment.customFields.externalId, JSON.stringify(fulfillment));
+    const first = await postWebhook("cafe-sur", delivered(), "evento-1");
+    assert.equal(first.status, 200);
+    assert.equal(((await first.json()) as { result: string }).result, "aplicado");
+    const again = await postWebhook("cafe-sur", delivered(), "evento-1");
+    assert.equal(((await again.json()) as { result: string }).result, "repetido");
+
+    adminClient.setChannelToken("cafe-sur");
+    const { order } = await adminClient.query(
+      gql`
+        query ($id: ID!) {
+          order(id: $id) {
+            state
+            payments {
+              state
+            }
+            fulfillments {
+              state
+              customFields {
+                trackingStatus
+              }
+            }
+          }
+        }
+      `,
+      { id: orderId },
+    );
+    adminClient.setChannelToken(DEFAULT_TOKEN);
+    assert.deepEqual(order, {
+      state: "Delivered",
+      payments: [{ state: "Settled" }],
+      fulfillments: [{ state: "Delivered", customFields: { trackingStatus: "Entregado" } }],
+    });
+  });
+
+  test("webhook con firma falsa → 401; de una tienda sin TrackingApp → 404", async () => {
+    assert.equal((await postWebhook("cafe-sur", delivered(), "evento-2", "whsec_falso")).status, 401);
+    assert.equal((await postWebhook(DEFAULT_TOKEN, delivered(), "evento-3")).status, 404);
   });
 });

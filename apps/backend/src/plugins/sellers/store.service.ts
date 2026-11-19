@@ -23,6 +23,17 @@ import {
 import { type CurrencyCode as SporaCurrency } from "@spora/shared";
 import { type DesignStyle } from "@spora/themes";
 import { cashOnDeliveryHandler } from "../payments/handlers";
+import { zoneRateArgs, zoneRateCalculator } from "../shipping/providers";
+
+/** Tarifa fija (calculadora por defecto de Vendure), con impuestos incluidos. */
+export const flatRate = (rate: number) => ({
+  code: defaultShippingCalculator.code,
+  arguments: [
+    { name: "rate", value: String(rate) },
+    { name: "includesTax", value: "include" },
+    { name: "taxRate", value: "0" },
+  ],
+});
 
 export type SellerStatus = "pendiente" | "activo" | "suspendido";
 export const sellerStatuses: SellerStatus[] = ["pendiente", "activo", "suspendido"];
@@ -127,44 +138,54 @@ export class StoreService {
   }
 
   /**
-   * Toda tienda nueva puede vender desde el primer día: envío propio con tarifa fija, retiro en local y contra
-   * entrega. El comercio los ajusta en el Admin UI. (Vendure los deja también en el canal por defecto.)
+   * Toda tienda nueva puede vender desde el primer día: envío propio (misma tarifa en todas las provincias, que el
+   * comercio ajusta por zona), retiro en local y contra entrega. (Vendure los deja también en el canal por defecto.)
    */
   private async createDefaultMethods(ctx: RequestContext, channelId: ID, slug: string, currency: SporaCurrency) {
-    const shipping = [
-      {
-        code: "envio",
-        name: "Envío a domicilio",
-        description: "Entrega en 2 a 4 días hábiles.",
-        rate: currency === "CRC" ? 250000 : 500,
-      },
-      { code: "retiro", name: "Retiro en local", description: "Coordine el retiro con la tienda.", rate: 0 },
-    ];
-    const shippingMethodIds: ID[] = [];
-    for (const method of shipping) {
-      const created = await this.shippingMethods.create(ctx, {
-        code: `${slug}-${method.code}`,
-        fulfillmentHandler: manualFulfillmentHandler.code,
-        checker: { code: defaultShippingEligibilityChecker.code, arguments: [{ name: "orderMinimum", value: "0" }] },
-        calculator: {
-          code: defaultShippingCalculator.code,
-          arguments: [
-            { name: "rate", value: String(method.rate) },
-            { name: "includesTax", value: "include" },
-            { name: "taxRate", value: "0" },
-          ],
-        },
-        translations: [{ languageCode: LanguageCode.es, name: method.name, description: method.description }],
-      });
-      shippingMethodIds.push(created.id);
-    }
-    await this.shippingMethods.assignShippingMethodsToChannel(ctx, { shippingMethodIds, channelId });
-
+    await this.addShippingMethod(ctx, channelId, slug, {
+      code: "envio",
+      name: "Envío a domicilio",
+      description: "Entrega en 2 a 4 días hábiles.",
+      calculator: { code: zoneRateCalculator.code, arguments: zoneRateArgs(currency === "CRC" ? 250000 : 500) },
+    });
+    await this.addShippingMethod(ctx, channelId, slug, {
+      code: "retiro",
+      name: "Retiro en local",
+      description: "Coordine el retiro con la tienda.",
+      calculator: flatRate(0),
+    });
     await this.addPaymentMethod(ctx, channelId, slug, {
       handler: cashOnDeliveryHandler.code,
       name: "Contra entrega",
       description: "Pague en efectivo o SINPE al recibir.",
     });
+  }
+
+  /**
+   * Activa un proveedor de envío en una tienda (código `<tienda>-<código>`): cómo cotiza (calculator) y quién crea la
+   * guía (fulfillment handler; por defecto, manual: la tienda entrega y marca el estado).
+   */
+  async addShippingMethod(
+    ctx: RequestContext,
+    channelId: ID,
+    slug: string,
+    method: {
+      code: string;
+      name: string;
+      description: string;
+      calculator: { code: string; arguments: { name: string; value: string }[] };
+      fulfillmentHandler?: string;
+    },
+  ) {
+    const created = await this.shippingMethods.create(ctx, {
+      code: `${slug}-${method.code}`,
+      fulfillmentHandler: method.fulfillmentHandler ?? manualFulfillmentHandler.code,
+      checker: { code: defaultShippingEligibilityChecker.code, arguments: [{ name: "orderMinimum", value: "0" }] },
+      calculator: method.calculator,
+      translations: [{ languageCode: LanguageCode.es, name: method.name, description: method.description }],
+    });
+    await this.shippingMethods.assignShippingMethodsToChannel(ctx, { shippingMethodIds: [created.id], channelId });
+    return created;
   }
 
   /**

@@ -406,6 +406,105 @@ try {
   assert.match(await text(pp.locator(".checkout__who")), /Confirmado/);
   await gw.close();
   ok("Tilopay simulado: rechazo vuelve al pago, retorno con firma falsa rechazado, y se completa con contra entrega");
+  // ── M5: envíos ─────────────────────────────────────────────────────────────────────────────────────────────────
+  // El comercio usa la Admin API (lo mismo que hace el Admin UI): en localhost, que Node sí resuelve.
+  const adminApi = async (query, variables = {}, token) => {
+    const res = await fetch("http://localhost:3000/admin-api", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "vendure-token": "tienda-demo",
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ query, variables }),
+    });
+    const body = await res.json();
+    if (body.errors) throw new Error(JSON.stringify(body.errors));
+    return { data: body.data, token: res.headers.get("vendure-auth-token") };
+  };
+  const { token: merchant } = await adminApi(
+    `mutation { login(username: "demo@spora.localhost", password: "demo1234") { __typename } }`,
+  );
+
+  const shipper = await browser.newContext({ viewport });
+  const pm = await shipper.newPage();
+  const mEmail = `marta.${Date.now()}@correo.cr`;
+  await pm.goto(`${STORE}/cuenta/registro`);
+  for (const [id, value] of Object.entries({
+    nombre: "Marta",
+    apellidos: "Solís",
+    correo: mEmail,
+    telefono: "8666-0000",
+    clave: "clave-segura",
+  })) {
+    await pm.fill(`#${id}`, value);
+  }
+  await pm.click(".form__submit");
+  await pm.waitForURL(`${STORE}/cuenta`);
+  await buy(pm, STORE, "gorra-sibu");
+  // Cotización: envío propio por zona, Correos por peso (gorra 150 g → 1 kg, GAM) y mensajería con rastreo.
+  await pm.goto(`${STORE}/carrito`);
+  await pm.click(".cart__checkout");
+  await pm.fill("#destinatario", "Marta Solís");
+  await pm.fill("#telefono-envio", "8666-0000");
+  await pm.selectOption("#distrito", "10201");
+  await pm.fill("#senas", "Casa 12");
+  await pm.click(".form__submit");
+  await pm.waitForURL(`${STORE}/checkout/envio`);
+  const quotes = (await pm.locator(".checkout__choice").allTextContents()).map((t) => t.replace(/\s+/g, " ").trim());
+  assert.ok(
+    quotes.some((q) => /Correos de Costa Rica \(Pymexpress\)₡2 300/.test(q)),
+    quotes.join(" | "),
+  );
+  assert.ok(
+    quotes.some((q) => /Envío a domicilio₡2 500/.test(q)),
+    quotes.join(" | "),
+  );
+  const shippedOrder = await checkout(pm, STORE, { shipping: "Mensajería con rastreo" });
+
+  // La tienda crea la guía (TrackingApp simulado) y el transportista reporta "en camino" y "entregado".
+  const { data } = await adminApi(
+    `query ($code: String!) { orders(options: { filter: { code: { eq: $code } } }) { items { id lines { id quantity } } } }`,
+    { code: shippedOrder },
+    merchant,
+  );
+  const target = data.orders.items[0];
+  const { data: fulfilled } = await adminApi(
+    `mutation ($input: FulfillOrderInput!) {
+      addFulfillmentToOrder(input: $input) { ... on Fulfillment { id method trackingCode } ... on ErrorResult { message } }
+    }`,
+    {
+      input: {
+        lines: target.lines.map((l) => ({ orderLineId: l.id, quantity: l.quantity })),
+        handler: { code: "trackingapp", arguments: [] },
+      },
+    },
+    merchant,
+  );
+  const guide = fulfilled.addFulfillmentToOrder;
+  assert.match(guide.trackingCode, /^SIM-\d{6}$/, JSON.stringify(guide));
+  for (const event of ["en_camino", "entregado"]) {
+    await adminApi(
+      `mutation ($id: ID!, $event: String!) { simulateShipmentEvent(fulfillmentId: $id, event: $event) }`,
+      { id: guide.id, event },
+      merchant,
+    );
+  }
+  const { data: after } = await adminApi(
+    `query ($id: ID!) { order(id: $id) { state payments { state } } }`,
+    { id: target.id },
+    merchant,
+  );
+  assert.deepEqual(after.order, { state: "Delivered", payments: [{ state: "Settled" }] });
+  await pm.goto(`${STORE}/cuenta`);
+  const row = (await pm.locator(".account__orders tbody tr").first().textContent())?.replace(/\s+/g, " ") ?? "";
+  assert.match(row, new RegExp(`${shippedOrder}.*Entregado.*${guide.trackingCode} · Entregado`));
+  await pm.goto(`${STORE}/pedido/${shippedOrder}`);
+  assert.match(await text(pm.locator(".shipment")), new RegExp(`TrackingApp: ${guide.trackingCode} · Entregado`));
+  await shipper.close();
+  ok(
+    `envíos: cotiza zona y Correos; guía ${guide.trackingCode} en TrackingApp; webhooks firmados la entregan y liquidan la contra entrega; rastreo en la cuenta`,
+  );
 } finally {
   await browser.close();
   console.log(results.join("\n"));

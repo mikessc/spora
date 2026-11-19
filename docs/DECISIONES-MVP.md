@@ -242,3 +242,45 @@ cómo revertirla.
 - **Decisión:** el cliente sube el comprobante (imagen o PDF, ≤ 5 MB) desde la confirmación. Queda como asset en el
   campo "Comprobante de pago" del pedido; el comercio lo revisa en el Admin UI y liquida el pago con el botón de Vendure.
 - **Revertir:** guardarlo en los metadatos del pago.
+
+## M5
+
+### 2026-11-19 — Envíos con las piezas de Vendure
+- **Decisión:** cotizar = `ShippingCalculator`; crear la guía = `FulfillmentHandler` (botón "Preparar envío" del Admin
+  UI); recibir estados = `ShipmentEventsService`, el único lugar que mueve guías y pedidos, alimentado por webhooks
+  (TrackingApp) o por el simulador. Agregar un transportista es un calculator + un handler más.
+- **Envío propio:** tarifa por provincia (la zona). Toda tienda nueva lo trae con la misma tarifa en las 7 provincias;
+  el comercio la ajusta. Retiro en local: tarifa 0 y entrega manual.
+- **Revertir:** no aplica.
+
+### 2026-11-19 — Contra entrega se envía antes de cobrar
+- **Duda:** el proceso de Vendure no deja enviar un pedido con el pago solo autorizado.
+- **Decisión:** se agregan las transiciones `PaymentAuthorized → Shipped/Delivered`. Al entregar, el pago de contra
+  entrega se liquida solo; SINPE y transferencia los liquida la tienda al revisar el comprobante.
+- **Revertir:** quitar `shipBeforeSettling` (habría que liquidar la contra entrega antes de despachar).
+
+### 2026-11-19 — TrackingApp: dirección como texto, sin `geoAreaId`
+- **Duda:** `POST /v1/shipments` de TrackingApp ubica al destinatario con `geoAreaId`, el id interno de su tabla de
+  áreas, y `/v1` no permite buscarlo por código del nomenclátor.
+- **Decisión:** se manda `addressLine` con señas, distrito, cantón, provincia y código postal, sin `geoAreaId`.
+- **Pendiente en TrackingApp:** aceptar el código del nomenclátor (p. ej. `geoAreaCode: "10201"`) en `recipient`.
+- **Contra entrega en USD:** `codAmount` no lleva moneda (pendiente del PLAN): se manda solo en colones; en dólares va
+  el monto en las notas del destinatario.
+- **Revertir:** no aplica.
+
+### 2026-11-19 — Webhooks de TrackingApp
+- **Decisión:** `POST /webhooks/trackingapp/<tienda>`. Firma `X-Tracking-Signature: t=<unix>,v1=<hex>` (HMAC-SHA256 de
+  `"<t>.<cuerpo>"`), verificada sobre el cuerpo crudo y rechazada si tiene más de 5 minutos. Idempotente por
+  `X-Tracking-Event-Id` (tabla `shipment_event`). Entregado → pedido entregado (y se liquida la contra entrega);
+  devuelto o cancelado → pedido cancelado (las comisiones de M6 se anulan con eso). El comercio pega en el Admin UI
+  (canal → pestaña "Envíos") su llave de cliente y el secreto del webhook: se guardan cifrados.
+- **Simulador:** la mutation `simulateShipmentEvent` manda el webhook firmado de verdad al endpoint de la tienda, así
+  se prueba también la verificación.
+- **Revertir:** no aplica.
+
+### 2026-11-19 — Correos: solo simulado
+- **Duda:** el Web Service de Pymexpress lo entrega Correos a cada comercio; no hay documentación pública (PLAN §8.2).
+- **Decisión:** cotización simulada por peso y zona (GAM o resto) y guías simuladas. Con `SPORA_ENVIOS_REALES=correos`
+  el adaptador real responde "falta la integración". El peso sale del nuevo campo de la variante (500 g si no está).
+- **Pendiente:** conseguir el contrato del Web Service con Correos y escribir el adaptador real.
+- **Revertir:** no aplica.

@@ -19,6 +19,7 @@
     "@vendure/asset-server-plugin": "3.8.2",
     "@vendure/common": "3.8.2",
     "@vendure/core": "3.8.2",
+    "express": "^5.1.0",
     "graphql": "^16.14.2",
     "graphql-tag": "^2.12.6",
     "pg": "^8.16.0",

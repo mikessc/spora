@@ -82,6 +82,7 @@ class AccountShopResolver {
       .innerJoin("order.customer", "customer")
       .innerJoin("customer.user", "user")
       .leftJoinAndSelect("order.channels", "channel")
+      .leftJoinAndSelect("order.fulfillments", "fulfillment")
       .where("user.id = :userId", { userId: ctx.activeUserId })
       .andWhere({ orderPlacedAt: Not(IsNull()) })
       .orderBy("order.orderPlacedAt", "DESC")
@@ -98,6 +99,17 @@ class AccountShopResolver {
         exchangeRate: order.customFields.exchangeRate,
         storeToken: store?.token ?? "",
         storeName: store?.customFields.storeName ?? store?.code ?? "",
+        shipment: (() => {
+          const f = order.fulfillments.find((x) => x.state !== "Cancelled") ?? order.fulfillments[0];
+          return f
+            ? {
+                method: f.method,
+                trackingCode: f.trackingCode,
+                trackingUrl: f.customFields.trackingUrl,
+                status: f.customFields.trackingStatus,
+              }
+            : null;
+        })(),
       };
     });
   }
@@ -117,6 +129,13 @@ class AccountShopResolver {
         exchangeRate: String
         storeToken: String!
         storeName: String!
+        shipment: SporaShipment
+      }
+      type SporaShipment {
+        method: String!
+        trackingCode: String!
+        trackingUrl: String
+        status: String
       }
       extend type Query {
         sporaOrders: [SporaOrder!]!

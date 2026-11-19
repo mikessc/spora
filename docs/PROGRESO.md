@@ -17,6 +17,32 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
   workaround en los componentes. Reporte para upstream en
   [reportes/sibujs-checked-ssr.md](reportes/sibujs-checked-ssr.md).
 
+## 2026-11-19 — M5: envíos ✔
+- Hecho:
+  - **Interfaz común**: cotizar (calculadora de Vendure) → crear la guía (botón del Admin UI) → recibir estados (un solo
+    servicio que mueve guías y pedidos). Cada tienda activa los suyos en el Admin UI.
+  - **Envío propio con tarifa por provincia**, **retiro en local**, **Correos de Costa Rica (Pymexpress)** por peso y
+    destino (simulado) y **TrackingApp** según el PLAN §8.1: `POST /v1/shipments` con `Idempotency-Key` por pedido,
+    `externalRef`, destinatario y `codAmount`; y webhooks firmados (HMAC, ventana de 5 min) procesados una sola vez
+    por id de evento.
+  - **Adaptador real + simulado**: TrackingApp real con `SPORA_ENVIOS_REALES=trackingapp` y la llave de la tienda; el
+    simulado crea guías `SIM-…` y `simulateShipmentEvent` manda webhooks firmados de verdad.
+  - **Estados**: en camino → enviado; entregado → pedido entregado y **contra entrega liquidada**; devuelto o
+    cancelado → pedido cancelado. Un pedido con contra entrega se puede despachar antes de cobrar.
+  - **Rastreo en la Cuenta Spora** y en la confirmación del pedido (código, enlace y último estado).
+  - Peso por variante (para cotizar); llave y secreto de TrackingApp cifrados en el canal.
+  - `migration:generate` aplica antes las migraciones pendientes (evita generar el esquema entero por error).
+- Tests: firma de TrackingApp (válida, alterada, otro secreto, vieja) y tarifa de Correos; en Vendure, webhook firmado
+  que entrega y liquida, repetido sin efecto, firma falsa → 401 y tienda sin TrackingApp → 404. `pnpm e2e` (19
+  recorridos) suma: cotización por zona y Correos, guía en TrackingApp, webhooks de "en camino" y "entregado", y el
+  rastreo en la cuenta del cliente.
+- Cómo probarlo: [LOCAL.md](LOCAL.md).
+- Pendiente:
+  - Correos real (falta el contrato del Web Service, que da Correos) y prueba contra una instancia local de TrackingApp.
+  - En TrackingApp: aceptar el código del nomenclátor en el destinatario, la moneda de `codAmount` y el endpoint
+    `/v1/webhooks` para registrarse sola. Ver [DECISIONES-MVP.md](DECISIONES-MVP.md).
+- Sigue: **M6**, comisiones y marketplace.
+
 ## 2026-11-19 — M4: pagos ✔
 - Hecho:
   - **Interfaz común**: cada proveedor es un handler de pago de Vendure y le dice al storefront qué sigue (listo,

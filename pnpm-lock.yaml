@@ -65,6 +65,9 @@ importers:
       '@vendure/core':
         specifier: 3.8.2
         version: 3.8.2(pg@8.23.1)(sql.js@1.14.2)(typescript@5.9.3)
+      express:
+        specifier: ^5.1.0
+        version: 5.3.0
       graphql:
         specifier: ^16.14.2
         version: 16.15.0

@@ -48,6 +48,15 @@ export const ORDER = /* GraphQL */ `
     amount
     metadata
   }
+  fulfillments {
+    method
+    trackingCode
+    state
+    customFields {
+      trackingUrl
+      trackingStatus
+    }
+  }
   lines {
     id
     quantity
@@ -100,6 +109,14 @@ export interface RawOrder {
   shippingAddress: RawAddress | null;
   shippingLines: { shippingMethod: { id: string; name: string } }[];
   payments: { method: string; state: string; amount: number; metadata: { public?: NextStep } | null }[] | null;
+  fulfillments:
+    | {
+        method: string;
+        trackingCode: string;
+        state: string;
+        customFields: { trackingUrl: string | null; trackingStatus: string | null } | null;
+      }[]
+    | null;
   lines: {
     id: string;
     quantity: number;
@@ -164,6 +181,13 @@ export const toCart = (o: RawOrder): Cart => {
       next: p.metadata?.public?.paso ? p.metadata.public : null,
     })),
     receipt: o.customFields?.paymentReceipt?.preview ?? null,
+    shipments: (o.fulfillments ?? []).map((f) => ({
+      method: f.method,
+      trackingCode: f.trackingCode,
+      trackingUrl: f.customFields?.trackingUrl ?? null,
+      status: f.customFields?.trackingStatus ?? null,
+      state: f.state,
+    })),
     lines: o.lines.map((l) => ({
       id: l.id,
       quantity: l.quantity,
@@ -204,7 +228,10 @@ export const toCustomer = (c: RawCustomer): Customer => ({
 });
 
 export const SPORA_ORDERS_QUERY = `query SporaOrders {
-  sporaOrders { code state orderPlacedAt total currencyCode exchangeRate storeName storeToken }
+  sporaOrders {
+    code state orderPlacedAt total currencyCode exchangeRate storeName storeToken
+    shipment { method trackingCode trackingUrl status }
+  }
 }`;
 
 export const toOrderSummary = (o: {
@@ -216,6 +243,7 @@ export const toOrderSummary = (o: {
   exchangeRate: string | null;
   storeName: string;
   storeToken: string;
+  shipment: OrderSummary["shipment"];
 }): OrderSummary => ({
   code: o.code,
   state: o.state,
@@ -224,4 +252,5 @@ export const toOrderSummary = (o: {
   exchangeRate: o.exchangeRate,
   storeName: o.storeName,
   storeToken: o.storeToken,
+  shipment: o.shipment,
 });

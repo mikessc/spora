@@ -7,6 +7,7 @@ import { AccountPlugin } from "./plugins/account/account.plugin";
 import { CatalogPlugin } from "./plugins/catalog/catalog.plugin";
 import { CurrencyPlugin } from "./plugins/currency/currency.plugin";
 import { PaymentsPlugin } from "./plugins/payments/payments.plugin";
+import { ShippingPlugin } from "./plugins/shipping/shipping.plugin";
 import { SellersPlugin } from "./plugins/sellers/sellers.plugin";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
@@ -68,5 +69,6 @@ export const config: VendureConfig = {
     CurrencyPlugin,
     AccountPlugin,
     PaymentsPlugin,
+    ShippingPlugin,
   ],
 };

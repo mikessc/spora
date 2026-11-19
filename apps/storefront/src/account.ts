@@ -107,6 +107,7 @@ function AccountPage(customer: Customer, orders: OrderSummary[], storeUrl: (toke
                 th({ scope: "col" }, "Tienda"),
                 th({ scope: "col" }, "Fecha"),
                 th({ scope: "col" }, "Estado"),
+                th({ scope: "col" }, "Envío"),
                 th({ scope: "col" }, "Total"),
               ]),
             ]),
@@ -117,6 +118,17 @@ function AccountPage(customer: Customer, orders: OrderSummary[], storeUrl: (toke
                   td([a({ href: storeUrl(o.storeToken) }, o.storeName)]),
                   td(o.placedAt ? formatDateTime(o.placedAt) : ""),
                   td(orderStateLabel(o.state)),
+                  td(
+                    "account__shipment",
+                    o.shipment
+                      ? [
+                          o.shipment.trackingUrl
+                            ? a({ href: o.shipment.trackingUrl, rel: "noopener" }, o.shipment.trackingCode)
+                            : o.shipment.trackingCode,
+                          o.shipment.status ? ` · ${o.shipment.status}` : "",
+                        ]
+                      : "—",
+                  ),
                   td(formatMoney(o.total)),
                 ]),
               ),

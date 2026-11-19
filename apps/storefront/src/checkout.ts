@@ -248,6 +248,20 @@ function OrderPage(order: Cart, notice?: string) {
           order.shippingMethod ? p(order.shippingMethod.name) : null,
         ])
       : null,
+    order.shipments.length
+      ? section("checkout__block", [
+          h2("Rastreo"),
+          ...order.shipments.map((s) =>
+            p("shipment", [
+              `${s.method}: `,
+              s.trackingUrl
+                ? a({ href: s.trackingUrl, rel: "noopener" }, s.trackingCode)
+                : span("shipment__code", s.trackingCode),
+              s.status ? ` · ${s.status}` : "",
+            ]),
+          ),
+        ])
+      : null,
     PaymentBlock(order, notice),
     Summary(order, order.exchangeRate),
     p([a({ href: "/" }, "Seguir comprando"), " · ", a({ href: "/cuenta" }, "Mis pedidos")]),

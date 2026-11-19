@@ -25,7 +25,7 @@ import { type CommonAttribute, type CurrencyCode as Currency, isCommonAttribute,
 import type { DesignStyle } from "@spora/themes";
 import { MarketplaceCategory } from "./plugins/catalog/entities";
 import { CatalogService } from "./plugins/catalog/catalog.service";
-import { StoreService } from "./plugins/sellers/store.service";
+import { flatRate, StoreService } from "./plugins/sellers/store.service";
 import { config } from "./vendure-config";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
@@ -62,6 +62,24 @@ interface StoreSeed {
   /** Proveedores de pago además de contra entrega (credenciales de ejemplo; se guardan cifradas). */
   payments: { handler: string; name: string; description: string; args?: Record<string, string> }[];
 }
+
+/** Envíos que suman las tiendas de ejemplo a los de siempre (envío propio por zona y retiro). */
+const extraShipping = (currency: Currency) => [
+  {
+    code: "correos",
+    name: "Correos de Costa Rica (Pymexpress)",
+    description: "Por peso y destino. Entrega en 3 a 5 días hábiles.",
+    calculator: { code: "correos-pymexpress", arguments: [] },
+    fulfillmentHandler: "correos-pymexpress",
+  },
+  {
+    code: "mensajeria",
+    name: "Mensajería con rastreo",
+    description: "Entrega con nuestra empresa de mensajería y rastreo en línea.",
+    calculator: flatRate(currency === "CRC" ? 200000 : 400),
+    fulfillmentHandler: "trackingapp",
+  },
+];
 
 const paypal = {
   handler: "paypal",
@@ -231,6 +249,9 @@ async function seedStore(seed: StoreSeed, ctx: RequestContext, connection: Trans
   for (const method of seed.payments) {
     await app.get(StoreService).addPaymentMethod(ctx, store.id, seed.slug, method);
   }
+  for (const method of extraShipping(seed.currency)) {
+    await app.get(StoreService).addShippingMethod(ctx, store.id, seed.slug, method);
+  }
 
   const csv = path.join(dir, `../seed/tiendas/${seed.slug}.csv`);
   const result = await importProductsFromCsv(app, csv, LanguageCode.es, store);
@@ -262,7 +283,11 @@ async function seedStore(seed: StoreSeed, ctx: RequestContext, connection: Trans
   }
 
   // Tema, textos y categorías propias de la tienda (mapeadas a las globales).
-  await app.get(ChannelService).update(storeCtx, { id: store.id, customFields: seed.theme });
+  // TrackingApp simulado: llave y secreto de desarrollo (en producción los pega el comercio; se guardan cifrados).
+  await app.get(ChannelService).update(storeCtx, {
+    id: store.id,
+    customFields: { ...seed.theme, trackingAppKey: "tk_simulada", trackingAppWebhookSecret: `whsec_${seed.slug}_dev` },
+  });
   for (const [name, marketplaceCategory, slugs] of seed.collections) {
     const productIds = await Promise.all(slugs.map(async (slug) => (await products.findOneBySlug(storeCtx, slug))!.id));
     await app.get(CollectionService).create(storeCtx, {

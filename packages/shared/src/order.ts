@@ -60,6 +60,19 @@ export interface Cart {
   payments: { method: string; state: string; amount: Money; next: NextStep | null }[];
   /** Comprobante de pago subido por el cliente (SINPE o transferencia). */
   receipt: string | null;
+  /** Guías de envío con su rastreo. */
+  shipments: Shipment[];
+}
+
+export interface Shipment {
+  /** Transportista: "TrackingApp", "Correos de Costa Rica", o lo que puso la tienda. */
+  method: string;
+  trackingCode: string;
+  trackingUrl: string | null;
+  /** Último estado que reportó el transportista. */
+  status: string | null;
+  /** Estado de Vendure: Pending, Shipped, Delivered, Cancelled. */
+  state: string;
 }
 
 export interface ShippingOption {
@@ -85,6 +98,7 @@ export interface OrderSummary {
   exchangeRate: string | null;
   storeName: string;
   storeToken: string;
+  shipment: Pick<Shipment, "method" | "trackingCode" | "trackingUrl" | "status"> | null;
 }
 
 /** Estados de Vendure en palabras del cliente. */

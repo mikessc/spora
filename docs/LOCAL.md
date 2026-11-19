@@ -58,6 +58,16 @@ curl sin configurar nada.
   las reales: `SPORA_PAGOS_REALES=paypal,tilopay` en `apps/backend/.env` y las credenciales en el método de pago de la
   tienda (Admin UI → Configuración → Métodos de pago).
 
+## Envíos
+- En el checkout: envío a domicilio (tarifa por provincia), retiro en local, Correos (por peso, simulado) y
+  "Mensajería con rastreo" (TrackingApp, simulado).
+- Para despachar: Admin UI → pedido → "Preparar envío" crea la guía. Para avanzar el rastreo sin transportista real:
+  Admin API, `simulateShipmentEvent(fulfillmentId, event)` con `en_camino`, `entregado`, `devuelto` o `cancelado`
+  (con TrackingApp manda el webhook firmado al endpoint de la tienda).
+- TrackingApp real: `SPORA_ENVIOS_REALES=trackingapp` y `TRACKINGAPP_API_URL`; la llave de cliente y el secreto del
+  webhook van en el canal (pestaña "Envíos"). En TrackingApp se registra el webhook
+  `http://localhost:3000/webhooks/trackingapp/<tienda>`.
+
 ## Tipo de cambio
 Sin credenciales del BCCR se usa la tasa fija `BCCR_SIMULATED_RATE` (₡515,00 por defecto). Para la real, poner
 `BCCR_EMAIL` y `BCCR_TOKEN` en `apps/backend/.env` (suscripción gratuita del BCCR).
