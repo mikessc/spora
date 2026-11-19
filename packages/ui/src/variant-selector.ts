@@ -1,6 +1,6 @@
-import type { OptionGroup, StockLevel, Variant } from "@spora/api-client";
+import type { OptionGroup, StockLevel, Variant } from "@spora/shared";
 import { derived, div, fieldset, input, isSSR, label, legend, p, signal, span } from "sibujs";
-import { formatMoney } from "../money";
+import { formatMoney } from "@spora/shared";
 import { emitVariant } from "./variant-event";
 
 export interface VariantSelectorProps {

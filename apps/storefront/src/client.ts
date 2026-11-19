@@ -1,11 +1,9 @@
 // Entrada del navegador: solo las islas. El resto de la página es HTML del servidor y no se toca.
 import { mountIslands, registerIsland } from "sibujs";
 import { islandComponent } from "sibujs/ssr";
-import { AddToCart } from "./islands/add-to-cart";
-import { Gallery } from "./islands/gallery";
-import { VariantSelector } from "./islands/variant-selector";
+import { islands } from "./islands";
 
-registerIsland("gallery", islandComponent(Gallery));
-registerIsland("variants", islandComponent(VariantSelector));
-registerIsland("add-to-cart", islandComponent(AddToCart));
+for (const [name, component] of Object.entries(islands)) {
+  registerIsland(name, islandComponent(component as (props: unknown) => Node));
+}
 mountIslands();

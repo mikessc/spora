@@ -1,7 +1,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AssetServerPlugin } from "@vendure/asset-server-plugin";
-import { DefaultJobQueuePlugin, type VendureConfig } from "@vendure/core";
+import { AdminUiPlugin } from "@vendure/admin-ui-plugin";
+import { DefaultJobQueuePlugin, DefaultSchedulerPlugin, type VendureConfig } from "@vendure/core";
+import { CatalogPlugin } from "./plugins/catalog/catalog.plugin";
+import { SellersPlugin } from "./plugins/sellers/sellers.plugin";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const env = (name: string, devDefault: string): string => {
@@ -26,7 +29,11 @@ export const config: VendureConfig = {
       identifier: env("SUPERADMIN_USER", "superadmin"),
       password: env("SUPERADMIN_PASSWORD", "superadmin"),
     },
-    cookieOptions: { secret: env("COOKIE_SECRET", "solo-desarrollo") },
+    // Nombres distintos para que la sesión del Admin UI y la del cliente no se pisen.
+    cookieOptions: {
+      secret: env("COOKIE_SECRET", "solo-desarrollo"),
+      name: { shop: "spora-sesion", admin: "spora-admin" },
+    },
   },
   dbConnectionOptions: {
     type: "postgres",
@@ -35,8 +42,8 @@ export const config: VendureConfig = {
     username: env("DB_USER", "spora"),
     password: env("DB_PASSWORD", "spora"),
     database: env("DB_NAME", "spora"),
-    // ponytail: synchronize solo para la Fase 0; migraciones desde la Fase 1.
-    synchronize: true,
+    synchronize: false,
+    migrations: [path.join(dir, "migrations/*.{ts,js}")],
   },
   paymentOptions: { paymentMethodHandlers: [] },
   importExportOptions: { importAssetsDir: path.join(dir, "../seed/assets") },
@@ -47,5 +54,10 @@ export const config: VendureConfig = {
       assetUrlPrefix: env("ASSET_URL_PREFIX", "http://localhost:3000/assets/"),
     }),
     DefaultJobQueuePlugin.init({}),
+    DefaultSchedulerPlugin.init(),
+    // Panel del comercio y admin de Spora (MVP.md): el Admin UI de Vendure, con roles por canal.
+    AdminUiPlugin.init({ route: "admin", port: Number(env("ADMIN_UI_PORT", "3002")) }),
+    SellersPlugin,
+    CatalogPlugin,
   ],
 };

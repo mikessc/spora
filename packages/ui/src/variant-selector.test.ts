@@ -1,4 +1,4 @@
-import type { Variant } from "@spora/api-client";
+import type { Variant } from "@spora/shared";
 import { renderToStringAsync } from "sibujs/ssr";
 import { expect, test } from "vitest";
 import { VariantSelector } from "./variant-selector";

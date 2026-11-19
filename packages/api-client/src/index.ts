@@ -1,50 +1,31 @@
 // Cliente de la Shop API de Vendure. Sin dependencias de SibuJS: funciona en el servidor y en el navegador.
 
-export type CurrencyCode = "CRC" | "USD";
-/** Dinero en enteros de la unidad menor (céntimos/centavos), siempre con su moneda. */
-export interface Money {
-  amount: number;
-  currency: CurrencyCode;
-}
-export type StockLevel = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
+import type { CurrencyCode, Money, Product, StockLevel } from "@spora/shared";
 
-export interface Asset {
-  id: string;
-  preview: string;
-  width: number;
-  height: number;
-}
-export interface OptionGroup {
-  id: string;
-  name: string;
-  options: { id: string; name: string }[];
-}
-export interface Variant {
-  id: string;
-  sku: string;
-  name: string;
-  price: Money;
-  stockLevel: StockLevel;
-  featuredAssetId: string | null;
-  optionIds: string[];
-}
-export interface Product {
-  id: string;
-  name: string;
-  slug: string;
-  /** HTML que escribe el comercio en el admin de Vendure. */
-  descriptionHtml: string;
-  assets: Asset[];
-  optionGroups: OptionGroup[];
-  variants: Variant[];
-}
+export type * from "@spora/shared";
+
 export interface CartSummary {
   code: string;
   totalQuantity: number;
   total: Money;
 }
 
-export class ShopApiError extends Error {}
+export class ShopApiError extends Error {
+  constructor(
+    message: string,
+    /** `STORE_NOT_ACTIVE` cuando la tienda existe pero su comercio no está activo. */
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
+
+export interface Store {
+  token: string;
+  name: string;
+  currency: CurrencyCode;
+  designStyle: string;
+}
 
 export interface ShopClientOptions {
   /** URL de la Shop API, p. ej. `http://localhost:3000/shop-api` (servidor) o `/shop-api` (navegador, vía proxy). */
@@ -52,6 +33,19 @@ export interface ShopClientOptions {
   /** Token del canal (la tienda). En el navegador lo pone el proxy. */
   channelToken?: string;
 }
+
+const STORE_QUERY = /* GraphQL */ `
+  query Store {
+    activeChannel {
+      token
+      defaultCurrencyCode
+      customFields {
+        storeName
+        designStyle
+      }
+    }
+  }
+`;
 
 const PRODUCT_QUERY = /* GraphQL */ `
   query Product($slug: String!) {
@@ -138,14 +132,34 @@ export function createShopClient({ url, channelToken }: ShopClientOptions) {
       credentials: "same-origin",
       body: JSON.stringify({ query, variables }),
     });
-    if (!res.ok) throw new ShopApiError(`Shop API respondió ${res.status}`);
-    const body = (await res.json()) as { data?: T; errors?: { message: string }[] };
-    if (body.errors?.length || !body.data)
-      throw new ShopApiError(body.errors?.map((e) => e.message).join("; ") ?? "Respuesta vacía");
+    const body = (await res.json().catch(() => ({}))) as {
+      data?: T;
+      errors?: { message: string; extensions?: { code?: string } }[];
+    };
+    if (!res.ok || body.errors?.length || !body.data) {
+      const message = body.errors?.map((e) => e.message).join("; ") || `Shop API respondió ${res.status}`;
+      throw new ShopApiError(message, body.errors?.[0]?.extensions?.code);
+    }
     return body.data;
   }
 
   return {
+    async store(): Promise<Store> {
+      const { activeChannel: c } = await request<{
+        activeChannel: {
+          token: string;
+          defaultCurrencyCode: CurrencyCode;
+          customFields: { storeName: string | null; designStyle: string };
+        };
+      }>(STORE_QUERY, {});
+      return {
+        token: c.token,
+        name: c.customFields.storeName ?? c.token,
+        currency: c.defaultCurrencyCode,
+        designStyle: c.customFields.designStyle,
+      };
+    },
+
     async product(slug: string): Promise<Product | null> {
       const { product } = await request<{ product: RawProduct | null }>(PRODUCT_QUERY, { slug });
       if (!product) return null;

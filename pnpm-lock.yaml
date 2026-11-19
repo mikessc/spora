@@ -38,22 +38,58 @@ importers:
 
   apps/backend:
     dependencies:
+      '@nestjs/common':
+        specifier: ^12.0.1
+        version: 12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/graphql':
+        specifier: ~14.0.0
+        version: 14.0.3(@nestjs/common@12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.5.1)(graphql@16.15.0)(reflect-metadata@0.2.2)(typescript@5.9.3)
+      '@spora/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@spora/themes':
+        specifier: workspace:*
+        version: link:../../packages/themes
+      '@vendure/admin-ui-plugin':
+        specifier: 3.8.2
+        version: 3.8.2(express@5.3.0)
       '@vendure/asset-server-plugin':
         specifier: 3.8.2
         version: 3.8.2(@types/node@22.20.5)
+      '@vendure/common':
+        specifier: 3.8.2
+        version: 3.8.2
       '@vendure/core':
         specifier: 3.8.2
-        version: 3.8.2(pg@8.23.1)(typescript@5.9.3)
+        version: 3.8.2(pg@8.23.1)(sql.js@1.14.2)(typescript@5.9.3)
+      graphql:
+        specifier: ^16.14.2
+        version: 16.15.0
+      graphql-tag:
+        specifier: ^2.12.6
+        version: 2.12.7(graphql@16.15.0)
       pg:
         specifier: ^8.16.0
         version: 8.23.1
+      typeorm:
+        specifier: ^0.3.21
+        version: 0.3.31(pg@8.23.1)(sql.js@1.14.2)
     devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.6
       '@types/node':
         specifier: ^22.15.0
         version: 22.20.5
+      '@vendure/testing':
+        specifier: 3.8.2
+        version: 3.8.2
       rimraf:
         specifier: ^6.0.0
         version: 6.1.4
+      sql.js:
+        specifier: 1.14.2
+        version: 1.14.2
       tsx:
         specifier: ^4.20.0
         version: 4.23.15
@@ -66,9 +102,15 @@ importers:
       '@spora/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@spora/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@spora/themes':
         specifier: workspace:*
         version: link:../../packages/themes
+      '@spora/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       hono:
         specifier: ^4.9.0
         version: 4.13.19
@@ -92,9 +134,27 @@ importers:
         specifier: ^4.20.0
         version: 4.23.15
 
-  packages/api-client: {}
+  packages/api-client:
+    dependencies:
+      '@spora/shared':
+        specifier: workspace:*
+        version: link:../shared
+
+  packages/shared: {}
 
   packages/themes: {}
+
+  packages/ui:
+    dependencies:
+      '@spora/shared':
+        specifier: workspace:*
+        version: link:../shared
+      sibujs:
+        specifier: 4.15.2
+        version: 4.15.2
+      sibujs-ui:
+        specifier: 1.10.0
+        version: 1.10.0(sibujs@4.15.2)
 
 packages:
 
@@ -1226,6 +1286,9 @@ packages:
     resolution: {integrity: sha512-k4lsFVpRZICbltkIEEH4hZRkwXkqDF1GHBpClKQOHQY+RkoZAAuyc1ci3I6p+CB6v3U4jaHIUshc4RzzQXZWLg==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
+  '@vendure/admin-ui-plugin@3.8.2':
+    resolution: {integrity: sha512-WYkxD/1GcxVgttVOixfFh9Y8P64goS5MraQG00lsGAmRD+/5FLTtuIRE7FAp5LcYHr6PAbB6KFVKgqhSK3gtJw==}
+
   '@vendure/asset-server-plugin@3.8.2':
     resolution: {integrity: sha512-qbNrnShNeUZBaUMCnZdrjTvHFU90Elv+1NgBsXe4xnDeXnFKO6WsBrZ3SDvEwGwSjKGei3JxC6AegLJE+X2n9Q==}
 
@@ -1239,6 +1302,9 @@ packages:
     peerDependenciesMeta:
       ioredis:
         optional: true
+
+  '@vendure/testing@3.8.2':
+    resolution: {integrity: sha512-baOhL/nHZHPWX3njiF8d2Q4DL/Vr3sg1LSoqmSm4cYlRyKgSSronWH9oyY3thpc3uGI7NZBlp/b1VKvxMlQ9FQ==}
 
   '@vitest/expect@3.2.7':
     resolution: {integrity: sha512-E8eBXaKibuvH2pSZErOjdVb5vF4PbKYcrnluBTYxEk1l/VhhwZg1kZQsdtjq+CsF5CFydf2Rdkz7jDHKSisi3w==}
@@ -1500,6 +1566,9 @@ packages:
   dataloader@2.2.3:
     resolution: {integrity: sha512-y2krtASINtPFS1rSDjacrFgn1dcUuoREVabwlOGOe4SdxenREqwjwjElAdwvbGM7kgZz9a3KVicWR7vcz8rnzA==}
 
+  date-fns@4.4.0:
+    resolution: {integrity: sha512-+1UMbeh68lH1SegH83CGWwpb6OHHbpSgr3+s5Eww5M4CAgswBpoWS0AjTOfEJ33HiYKz1hdj/KTFprzXHmq/6w==}
+
   dayjs@1.11.23:
     resolution: {integrity: sha512-QDTCU0M0MxR3hQfnlDJfwekQiaanm1ubOD231u73WBckQ/fsamwRLiE2GBz6D3a/xF1NgfiDLJjXBa1hYOYTtQ==}
 
@@ -1681,9 +1750,18 @@ packages:
   exponential-backoff@3.1.3:
     resolution: {integrity: sha512-ZgEeZXj30q+I0EN+CbSSpIyPaJ5HVQD18Z1m+u1FXbAeT94mr1zw50q4q6jiiC447Nl/YTcIYSAftiGqetwXCA==}
 
+  express-rate-limit@7.5.1:
+    resolution: {integrity: sha512-7iN8iPMDzOMHPUYllBEsQdWVB6fPDMPqwjBaFrgr4Jgr/+okjvzAy+UHlYYL/Vs0OsOrMkwS6PJDkFlJwoxUnw==}
+    engines: {node: '>= 16'}
+    peerDependencies:
+      express: '>= 4.11'
+
   express@5.3.0:
     resolution: {integrity: sha512-qCqy1xSoaugxOD4IVHb1ZWdkvCF2W3aE2okKouWj8VwJ+ztskSiXoBnCSJqfKT+cVPJhuJqe9YLbY425+Zh00g==}
     engines: {node: '>= 18'}
+
+  faker@4.1.0:
+    resolution: {integrity: sha512-ILKg69P6y/D8/wSmDXw35Ly0re8QzQ8pMfBCflsGiZG2ZjMUNLYNexA6lz5pkmJlepVdsiDFUxYAzPQ9/+iGLA==}
 
   fast-deep-equal@3.1.3:
     resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
@@ -2497,6 +2575,9 @@ packages:
     resolution: {integrity: sha512-ed7OK4e9ywpE7pgRMkMQmZDPKSVdm0oX5IEtZiKnFucSF0zu6c80GZBe38UqHuVhTWJ9xsKgSMjCG2bml86KvA==}
     engines: {node: '>=14'}
 
+  sql.js@1.14.2:
+    resolution: {integrity: sha512-3ZGPovObMFrdw79zrUHbfdE/DLIsy8jdNdssmMSQuRAymedU6q84asPt0kgiqrdMYlPegDItiIMfmIXzZnYFcw==}
+
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
 
@@ -2919,7 +3000,7 @@ snapshots:
       '@apollo/utils.withrequired': 3.0.0
       '@graphql-tools/merge': 9.2.4(graphql@16.15.0)
       '@graphql-tools/schema': 10.1.1(graphql@16.15.0)
-      '@graphql-tools/utils': 10.11.0(graphql@16.15.0)
+      '@graphql-tools/utils': 12.0.1(graphql@16.15.0)
       async-retry: 1.3.3
       body-parser: 2.4.0
       content-type: 1.0.5
@@ -3259,7 +3340,7 @@ snapshots:
       '@whatwg-node/promise-helpers': 1.3.2
       cross-inspect: 1.0.1
       graphql: 16.15.0
-      tslib: 2.8.1
+      tslib: 2.9.1
 
   '@graphql-tools/utils@12.1.0(graphql@16.15.0)':
     dependencies:
@@ -3502,13 +3583,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@nestjs/typeorm@12.0.3(@nestjs/common@12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.5.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(pg@8.23.1))':
+  '@nestjs/typeorm@12.0.3(@nestjs/common@12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.5.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(pg@8.23.1)(sql.js@1.14.2))':
     dependencies:
       '@nestjs/common': 12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 12.5.1(@nestjs/common@12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@12.5.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
-      typeorm: 0.3.31(pg@8.23.1)
+      typeorm: 0.3.31(pg@8.23.1)(sql.js@1.14.2)
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
@@ -3811,6 +3892,14 @@ snapshots:
       '@typescript-eslint/types': 8.73.0
       eslint-visitor-keys: 5.0.1
 
+  '@vendure/admin-ui-plugin@3.8.2(express@5.3.0)':
+    dependencies:
+      date-fns: 4.4.0
+      express-rate-limit: 7.5.1(express@5.3.0)
+      fs-extra: 11.4.1
+    transitivePeerDependencies:
+      - express
+
   '@vendure/asset-server-plugin@3.8.2(@types/node@22.20.5)':
     dependencies:
       '@types/express': 5.0.6
@@ -3825,7 +3914,7 @@ snapshots:
 
   '@vendure/common@3.8.2': {}
 
-  '@vendure/core@3.8.2(pg@8.23.1)(typescript@5.9.3)':
+  '@vendure/core@3.8.2(pg@8.23.1)(sql.js@1.14.2)(typescript@5.9.3)':
     dependencies:
       '@apollo/server': 5.5.2(graphql@16.15.0)
       '@as-integrations/express5': 1.1.2(@apollo/server@5.5.2(graphql@16.15.0))(express@5.3.0)
@@ -3836,7 +3925,7 @@ snapshots:
       '@nestjs/core': 12.5.1(@nestjs/common@12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@12.5.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/graphql': 14.0.3(@nestjs/common@12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.5.1)(graphql@16.15.0)(reflect-metadata@0.2.2)(typescript@5.9.3)
       '@nestjs/platform-express': 12.5.1(@nestjs/common@12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.5.1)(rxjs@7.8.2)
-      '@nestjs/typeorm': 12.0.3(@nestjs/common@12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.5.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(pg@8.23.1))
+      '@nestjs/typeorm': 12.0.3(@nestjs/common@12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.5.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(pg@8.23.1)(sql.js@1.14.2))
       '@types/express': 5.0.6
       '@vendure/common': 3.8.2
       bcrypt: 6.0.0
@@ -3867,7 +3956,7 @@ snapshots:
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
       semver: 7.8.6
-      typeorm: 0.3.31(pg@8.23.1)
+      typeorm: 0.3.31(pg@8.23.1)(sql.js@1.14.2)
     optionalDependencies:
       re2: 1.23.3
     transitivePeerDependencies:
@@ -3902,6 +3991,16 @@ snapshots:
       - typeorm-aurora-data-api-driver
       - typescript
       - utf-8-validate
+
+  '@vendure/testing@3.8.2':
+    dependencies:
+      '@graphql-typed-document-node/core': 3.2.0(graphql@16.15.0)
+      '@vendure/common': 3.8.2
+      faker: 4.1.0
+      graphql: 16.15.0
+      graphql-tag: 2.12.7(graphql@16.15.0)
+      mime-types: 3.0.2
+      sql.js: 1.14.2
 
   '@vitest/expect@3.2.7':
     dependencies:
@@ -4167,6 +4266,8 @@ snapshots:
 
   dataloader@2.2.3: {}
 
+  date-fns@4.4.0: {}
+
   dayjs@1.11.23: {}
 
   debug@3.2.7:
@@ -4373,6 +4474,10 @@ snapshots:
   exponential-backoff@3.1.3:
     optional: true
 
+  express-rate-limit@7.5.1(express@5.3.0):
+    dependencies:
+      express: 5.3.0
+
   express@5.3.0:
     dependencies:
       accepts: 2.0.0
@@ -4405,6 +4510,8 @@ snapshots:
       vary: 1.1.2
     transitivePeerDependencies:
       - supports-color
+
+  faker@4.1.0: {}
 
   fast-deep-equal@3.1.3: {}
 
@@ -5202,6 +5309,8 @@ snapshots:
 
   sql-highlight@6.1.0: {}
 
+  sql.js@1.14.2: {}
+
   stackback@0.0.2: {}
 
   statuses@2.0.2: {}
@@ -5334,7 +5443,7 @@ snapshots:
       es-errors: 1.3.0
       is-typed-array: 1.1.15
 
-  typeorm@0.3.31(pg@8.23.1):
+  typeorm@0.3.31(pg@8.23.1)(sql.js@1.14.2):
     dependencies:
       '@sqltools/formatter': 1.2.5
       ansis: 4.5.0
@@ -5353,6 +5462,7 @@ snapshots:
       yargs: 17.7.3
     optionalDependencies:
       pg: 8.23.1
+      sql.js: 1.14.2
     transitivePeerDependencies:
       - babel-plugin-macros
       - supports-color

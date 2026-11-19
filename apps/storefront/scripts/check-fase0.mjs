@@ -1,9 +1,9 @@
 // Verifica los criterios de la Fase 0 con Chrome real. Requiere Vendure (3000) y el storefront (4000) corriendo.
-//   pnpm --filter @spora/storefront check
+//   pnpm e2e
 import assert from "node:assert/strict";
 import { chromium } from "playwright-core";
 
-const BASE = process.env.STOREFRONT_URL ?? "http://localhost:4000";
+const BASE = process.env.STOREFRONT_URL ?? "http://tienda-demo.spora.localhost:4000";
 const URL = `${BASE}/producto/camiseta-sibu`;
 const browser = await chromium.launch({ channel: process.env.CHROME_CHANNEL ?? "chrome" });
 const viewport = { width: 1200, height: 900 };
@@ -13,8 +13,21 @@ const text = async (loc) => ((await loc.textContent()) ?? "").replace(/\s/g, " "
 const ok = (name) => results.push(`✔ ${name}`);
 
 try {
-  // 1. Sin JS el HTML trae el producto completo.
   const noJs = await browser.newContext({ javaScriptEnabled: false, viewport });
+
+  // 0. El dominio decide la tienda: una tienda inexistente o el dominio raíz dan 404. (Desde el navegador: Node en
+  // Windows no resuelve *.localhost.)
+  const p0 = await noJs.newPage();
+  for (const url of [
+    "http://no-existe.spora.localhost:4000/producto/camiseta-sibu",
+    "http://localhost:4000/producto/x",
+  ]) {
+    assert.equal((await p0.goto(url))?.status(), 404, url);
+  }
+  await p0.close();
+  ok("dominio: tienda inexistente y dominio raíz → 404");
+
+  // 1. Sin JS el HTML trae el producto completo.
   const p1 = await noJs.newPage();
   await p1.goto(URL, { waitUntil: "load" });
   assert.equal(await p1.locator("h1").textContent(), "Camiseta Sibú");

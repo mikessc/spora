@@ -17,7 +17,9 @@
     "@spora/themes": "workspace:*",
     "hono": "^4.9.0",
     "sibujs": "4.15.2",
-    "sibujs-ui": "1.10.0"
+    "sibujs-ui": "1.10.0",
+    "@spora/ui": "workspace:*",
+    "@spora/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

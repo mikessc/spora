@@ -3,19 +3,32 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "seed": "tsx src/seed.ts",
-    "dev": "tsx src/index.ts",
+    "seed": "tsx --env-file-if-exists=.env src/seed.ts",
+    "dev": "tsx --env-file-if-exists=.env src/index.ts",
+    "migration:generate": "tsx --env-file-if-exists=.env src/migrate.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "test": "tsx --test --test-concurrency=1 \"src/**/*.test.ts\""
   },
   "dependencies": {
+    "@nestjs/common": "^12.0.1",
+    "@nestjs/graphql": "~14.0.0",
+    "@vendure/admin-ui-plugin": "3.8.2",
     "@vendure/asset-server-plugin": "3.8.2",
+    "@vendure/common": "3.8.2",
     "@vendure/core": "3.8.2",
-    "pg": "^8.16.0"
+    "graphql": "^16.14.2",
+    "graphql-tag": "^2.12.6",
+    "pg": "^8.16.0",
+    "typeorm": "^0.3.21",
+    "@spora/shared": "workspace:*",
+    "@spora/themes": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
+    "@vendure/testing": "3.8.2",
     "rimraf": "^6.0.0",
-    "tsx": "^4.20.0"
+    "sql.js": "1.14.2",
+    "tsx": "^4.20.0",
+    "@types/express": "^5.0.0"
   }
 }

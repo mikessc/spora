@@ -16,6 +16,32 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
   workaround en los componentes. Reporte para upstream en
   [reportes/sibujs-checked-ssr.md](reportes/sibujs-checked-ssr.md).
 
+## 2026-11-19 — M1: comercios, tiendas y catálogo ✔
+- Hecho:
+  - **Alta de comercio** (`registerStore`, Admin API, superadmin): crea comercio, canal (moneda base CRC o USD),
+    **ubicación de stock propia**, rol limitado a su canal y usuario administrador. Lo mismo usa el seed, así que
+    todo canal nuevo nace con bodega.
+  - **Estados del comercio** `pendiente` / `activo` / `suspendido` (custom field del vendedor, solo superadmin). Una
+    tienda no activa responde 403 en la Shop API y 404 en el storefront.
+  - **Catálogo global** (plugin `catalog`): categorías del marketplace en árbol, marcas curadas (proponer sin duplicar
+    → aprobar → fusionar, que mueve los productos de todas las tiendas) y atributos comunes por grupo de opciones.
+  - **Regla de publicación**: un producto publicado exige categoría global; vale para el Admin UI, la API y el
+    importador.
+  - **Migraciones** en vez de `synchronize` (`src/migrations`, se aplican al arrancar y en el seed).
+  - **`@spora/ui`** con los componentes (galería, selector de variantes, agregar al carrito) y su CSS;
+    **`@spora/shared`** con dinero, tipos de catálogo, `slugify` y atributos comunes.
+  - **La tienda se elige por dominio**: `<tienda>.spora.localhost:4000`; el estilo sale del canal (`?estilo=` sigue
+    sirviendo como vista previa).
+  - Admin UI de Vendure en `/admin`; telemetría de Vendure apagada en `.env.example`.
+- Tests: 9 de integración contra Vendure en memoria (alta, bodega, rol, 403 por estado, árbol de categorías, regla de
+  publicación, marcas sin duplicados, fusión) + unitarios de dominio de tienda. `pnpm check` y `pnpm e2e` en verde.
+- Cómo probarlo: [LOCAL.md](LOCAL.md) (arranque, URLs y usuarios).
+- Pendiente:
+  - En el Admin UI la categoría global y la marca se escriben como slug (no hay selector) y no hay pantallas para
+    aprobar o fusionar marcas: se hace por la Admin API. Ver [DECISIONES-MVP.md](DECISIONES-MVP.md).
+  - `pnpm dev` no recompila el JS del cliente al editar islas (hay que correr `build:client`).
+- Sigue: **M2**, storefront multi-tenant y estilos.
+
 ## 2026-11-19 — M0: monorepo y prueba de SibuJS ✔
 M0 se da por hecho con la prueba de la Fase 0 del PLAN.
 - Hecho: monorepo pnpm + Turborepo con
@@ -35,24 +61,9 @@ M0 se da por hecho con la prueba de la Fase 0 del PLAN.
   - El importador CSV guarda los precios en la moneda del **canal por defecto**: el seed lo pone en CRC.
   - Un canal nuevo necesita una ubicación de stock asignada; si no, todo sale agotado.
   - Vendure trae telemetría anónima activada; se apaga con `VENDURE_DISABLE_TELEMETRY=true`.
-- Atajos conscientes (marcados con `ponytail:` en el código), pendientes para M1:
-  - `synchronize: true` en vez de migraciones.
-  - Una sola tienda fija (`STORE_TOKEN`).
-  - Los componentes viven en `apps/storefront` y no en `@spora/ui`, que todavía no existe.
-  - La descripción del producto se muestra como texto plano, sin el HTML del comercio.
+- Atajos conscientes: `synchronize`, una sola tienda fija y componentes fuera de `@spora/ui` (resueltos en M1). Queda:
+  la descripción del producto se muestra como texto plano, sin el HTML del comercio.
 
-### Cómo probarlo
-```sh
-pnpm install
-pnpm db                              # Postgres y Meilisearch en Docker (db:reset para empezar de cero)
-pnpm seed                            # canal + producto (idempotente)
-pnpm --filter @spora/backend dev     # Vendure en :3000
-pnpm --filter @spora/storefront dev  # http://localhost:4000/producto/camiseta-sibu?estilo=minimal
-pnpm check                           # formato, tipos, tests y lint
-pnpm e2e                             # criterios de la Fase 0 en Chrome (con los dos servidores arriba)
-```
-
-### Sigue: M1 — comercios, tiendas y catálogo
 
 ## 2026-11-18 — Plan del MVP
 - Hecho: [MVP.md](MVP.md) con el alcance y las etapas M0–M7 para tener Spora corriendo en local.

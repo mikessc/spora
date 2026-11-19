@@ -1,4 +1,4 @@
-import type { Asset } from "@spora/api-client";
+import type { Asset } from "@spora/shared";
 import { button, div, img, li, onMount, signal, ul } from "sibujs";
 import { onVariant } from "./variant-event";
 

@@ -2,9 +2,7 @@
 import type { Product } from "@spora/api-client";
 import { div, h1, main, p, section } from "sibujs";
 import { island } from "sibujs/ssr";
-import { AddToCart } from "./islands/add-to-cart";
-import { Gallery } from "./islands/gallery";
-import { VariantSelector } from "./islands/variant-selector";
+import { islands } from "./islands";
 
 /**
  * La descripción la escribe el comercio: se muestra como texto (SibuJS escapa), nunca como HTML.
@@ -24,7 +22,7 @@ export function ProductPage(product: Product) {
 
   return main("product-page", [
     section({ class: "product-page__media", "aria-label": "Fotos" }, [
-      island("gallery", Gallery, {
+      island("gallery", islands.gallery, {
         productName: product.name,
         assets: product.assets,
         initialAssetId: initial?.featuredAssetId ?? null,
@@ -32,12 +30,12 @@ export function ProductPage(product: Product) {
     ]),
     section("product-page__info", [
       h1("product-page__title", product.name),
-      island("variants", VariantSelector, {
+      island("variants", islands.variants, {
         optionGroups: product.optionGroups,
         variants: product.variants,
         initialVariantId: initial?.id ?? "",
       }),
-      island("add-to-cart", AddToCart, { variant: initialVariant }),
+      island("add-to-cart", islands["add-to-cart"], { variant: initialVariant }),
       div(
         "product-page__description",
         paragraphs(product.descriptionHtml).map((text) => p(text)),

@@ -1,4 +1,11 @@
-import type { Money } from "@spora/api-client";
+export type CurrencyCode = "CRC" | "USD";
+export const currencyCodes = ["CRC", "USD"] as const satisfies readonly CurrencyCode[];
+
+/** Dinero en enteros de la unidad menor (céntimos/centavos), siempre con su moneda. */
+export interface Money {
+  amount: number;
+  currency: CurrencyCode;
+}
 
 /** ₡12 500 o $25,50: sin decimales cuando el monto es redondo. */
 export function formatMoney({ amount, currency }: Money): string {

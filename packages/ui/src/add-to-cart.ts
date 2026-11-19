@@ -1,11 +1,12 @@
-import { createShopClient } from "@spora/api-client";
+import { formatMoney, type Money } from "@spora/shared";
 import { div, onMount, p, signal } from "sibujs";
 import { Button } from "sibujs-ui";
-import { formatMoney } from "../money";
 import { onVariant, type SelectedVariant } from "./variant-event";
 
 export interface AddToCartProps {
   variant: SelectedVariant | null;
+  /** Lo conecta la app (el componente no conoce la API). En el servidor no se llama nunca. */
+  onAdd: (variantId: string) => Promise<{ totalQuantity: number; total: Money }>;
 }
 
 type Status = "idle" | "adding" | "done" | "error";
@@ -20,8 +21,7 @@ export function AddToCart(props: AddToCartProps) {
     if (!v?.available || status() === "adding") return;
     setStatus("adding");
     try {
-      // En el navegador se habla con Vendure vía el proxy del storefront (misma cookie de sesión).
-      const cart = await createShopClient({ url: "/shop-api" }).addItemToOrder(v.id, 1);
+      const cart = await props.onAdd(v.id);
       setStatus("done");
       setMessage(`Agregado. Carrito: ${cart.totalQuantity} artículo(s), ${formatMoney(cart.total)}.`);
     } catch {
