@@ -8,3 +8,6 @@ apps/storefront/public/cliente.js
 .vendure/
 apps/backend/__data__/
 apps/marketplace/public/marketplace.js
+
+# Panel Spora (Vendure Dashboard): carpeta de compilación de la config
+apps/backend/.vendure-dashboard-temp/

@@ -7,7 +7,7 @@ Requisitos: Node ≥ 22.3, pnpm 9, Docker Desktop y Google Chrome (solo para `pn
 docker compose up -d # PostgreSQL (5433) y Meilisearch (7700)
 pnpm install
 pnpm seed            # espera a la base, migraciones + datos de ejemplo (idempotente)
-pnpm dev             # Vendure + Admin UI (3000), storefront (4000) y marketplace (5000)
+pnpm dev             # Vendure + Panel Spora (3000), storefront (4000) y marketplace (5000)
 ```
 
 Sin `.env` se usan los valores de desarrollo (opcional: `cp apps/backend/.env.example apps/backend/.env`). Para
@@ -26,8 +26,8 @@ empezar de cero: `pnpm db:reset && pnpm seed`. Recorrido guiado para revisar tod
 | Artesanía (CRC) | <http://barro-telar.spora.localhost:4000/> |
 | Otro estilo (vista previa) | agregar `?estilo=` con `suave`, `minimal`, `vibrante`, `editorial` o `pop` a cualquier página |
 | Sitemap / robots | <http://tienda-demo.spora.localhost:4000/sitemap.xml>, `/robots.txt` |
-| Admin UI (comercio y Spora) | <http://localhost:3000/admin> |
-| Panel de comisiones | <http://localhost:3000/panel/comisiones> (con la sesión del Admin UI) |
+| Panel Spora (comercio y admin de Spora) | <http://localhost:3000/dashboard> |
+| Comisiones / Mi tienda | <http://localhost:3000/dashboard/comisiones>, `/dashboard/mi-tienda` (las direcciones viejas `/panel/…` redirigen) |
 | Meilisearch | <http://localhost:7700> (llave de desarrollo `solo-desarrollo-meili`) |
 | Admin API (GraphiQL) | <http://localhost:3000/admin-api> |
 | Shop API | <http://localhost:3000/shop-api> (header `vendure-token: <tienda>`) |
@@ -47,11 +47,11 @@ curl sin configurar nada.
 | Cliente nuevo | se crea en `/cuenta/registro` de cualquier tienda | |
 
 ## Tareas comunes
-- **Tema de la tienda:** <http://localhost:3000/panel/tienda> con la sesión del comercio en el Admin UI: estilo, color
-  de marca, tipografía, logo, frase, textos, políticas y credenciales de TrackingApp (mutation `updateStoreSettings`).
-  El comercio no puede guardar el canal en el Admin UI: el resto (monedas, impuestos, código) es del admin de Spora.
+- **Tema de la tienda:** Panel Spora → **Mi tienda**: estilo, color de marca, tipografía, logo, frase, textos,
+  políticas y credenciales de TrackingApp (mutation `updateStoreSettings`). El resto del canal (monedas, impuestos,
+  código) es del admin de Spora.
 - **Dar de alta un comercio:** Admin API, como superadmin, mutation `registerStore` (crea comercio en estado
-  `pendiente`, canal, bodega, rol y usuario). Para publicarla: Admin UI → Configuración → Vendedores → Estado
+  `pendiente`, canal, bodega, rol y usuario). Para publicarla: Panel Spora → Configuración → Vendedores → Estado
   `activo`.
 - **Categorías globales y marcas:** Admin API, queries `marketplaceCategories` y `brands`; mutations
   `createMarketplaceCategory`, `proposeBrand`, `approveBrand` y `mergeBrands`. En el producto se asignan por slug en
@@ -61,19 +61,19 @@ curl sin configurar nada.
 
 ## Pagos
 - Contra entrega, SINPE Móvil y transferencia funcionan sin nada más. Con SINPE o transferencia el cliente sube el
-  comprobante en la confirmación; la tienda lo ve en el Admin UI (pedido → "Comprobante de pago") y liquida el pago.
+  comprobante en la confirmación; la tienda lo ve en el Panel Spora (pedido → "Comprobante de pago") y liquida el pago.
 - PayPal y Tilopay usan una pasarela simulada (`http://localhost:3000/pagos-simulados`): "Aprobar" o "Rechazar". Para
   las reales: `SPORA_PAGOS_REALES=paypal,tilopay` en `apps/backend/.env` y las credenciales en el método de pago de la
-  tienda (Admin UI → Configuración → Métodos de pago).
+  tienda (Panel Spora → Configuración → Métodos de pago).
 
 ## Envíos
 - En el checkout: envío a domicilio (tarifa por provincia), retiro en local, Correos (por peso, simulado) y
   "Mensajería con rastreo" (TrackingApp, simulado).
-- Para despachar: Admin UI → pedido → "Preparar envío" crea la guía. Para avanzar el rastreo sin transportista real:
+- Para despachar: Panel Spora → pedido → "Preparar envío" crea la guía. Para avanzar el rastreo sin transportista real:
   Admin API, `simulateShipmentEvent(fulfillmentId, event)` con `en_camino`, `entregado`, `devuelto` o `cancelado`
   (con TrackingApp manda el webhook firmado al endpoint de la tienda).
 - TrackingApp real: `SPORA_ENVIOS_REALES=trackingapp` y `TRACKINGAPP_API_URL`; la llave de cliente y el secreto del
-  webhook se cargan en `/panel/tienda`. En TrackingApp se registra el webhook
+  webhook se cargan en Panel Spora → Mi tienda. En TrackingApp se registra el webhook
   `http://localhost:3000/webhooks/trackingapp/<tienda>`.
 
 ## Comisiones y marketplace
@@ -97,3 +97,12 @@ Sin credenciales del BCCR se usa la tasa fija `BCCR_SIMULATED_RATE` (₡515,00 p
 `pnpm seed` crea 4 tiendas (moda, café, artesanía y tecnología), 37 productos, marcas (una solo propuesta), métodos
 de pago y envío y el cliente de prueba con sus pedidos. Los productos están en `apps/backend/seed/tiendas/*.csv`
 (formato del importador de Vendure); los `*.mas.csv` y sus imágenes salen de `node apps/backend/seed/generar-catalogo.mjs`.
+
+## Panel Spora (Vendure Dashboard)
+- `pnpm dev` levanta también el Vite del panel (puerto 5173); Vendure lo sirve en <http://localhost:3000/dashboard>.
+  La primera visita compila el panel y tarda unos segundos. Para la versión compilada:
+  `pnpm --filter @spora/backend build` (queda en `apps/backend/dist/dashboard`).
+- Pantallas propias en `apps/backend/src/plugins/panel/dashboard/`: Mi tienda, Comisiones y, solo para el admin de
+  Spora, Disputas y Acuerdos de comisión. Ver [ADR 0007](adr/0007-vendure-dashboard.md).
+- **Cambiar el logo:** reemplazar `apps/backend/src/plugins/panel/dashboard/logo.svg` (se usa en el login, la barra
+  lateral y el favicon). Los colores del panel están en `apps/backend/src/plugins/panel/theme.ts`.

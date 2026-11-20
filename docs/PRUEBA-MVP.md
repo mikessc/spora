@@ -21,11 +21,11 @@ docker compose up -d && pnpm install && pnpm seed && pnpm dev
 
 | Quién | Usuario | Clave | Dónde |
 | --- | --- | --- | --- |
-| Admin de Spora | `superadmin` | `superadmin` | <http://localhost:3000/admin> |
-| Tienda Demo (moda, CRC, 8 %) | `demo@spora.localhost` | `demo1234` | <http://localhost:3000/admin> |
-| Café Sur (café, USD, 6 %) | `cafe@spora.localhost` | `cafe1234` | <http://localhost:3000/admin> |
-| Barro y Telar (artesanía, CRC, 10 %) | `barro@spora.localhost` | `barro1234` | <http://localhost:3000/admin> |
-| Voltio (tecnología, USD, 5 %) | `voltio@spora.localhost` | `voltio1234` | <http://localhost:3000/admin> |
+| Admin de Spora | `superadmin` | `superadmin` | <http://localhost:3000/dashboard> |
+| Tienda Demo (moda, CRC, 8 %) | `demo@spora.localhost` | `demo1234` | <http://localhost:3000/dashboard> |
+| Café Sur (café, USD, 6 %) | `cafe@spora.localhost` | `cafe1234` | <http://localhost:3000/dashboard> |
+| Barro y Telar (artesanía, CRC, 10 %) | `barro@spora.localhost` | `barro1234` | <http://localhost:3000/dashboard> |
+| Voltio (tecnología, USD, 5 %) | `voltio@spora.localhost` | `voltio1234` | <http://localhost:3000/dashboard> |
 | Cliente con pedidos | `cliente@spora.localhost` | `cliente1234` | cualquier tienda o el marketplace |
 
 Las tiendas viven en `http://<tienda>.spora.localhost:4000` y el marketplace en <http://spora.localhost:5000>.
@@ -82,7 +82,7 @@ En <http://tienda-demo.spora.localhost:4000/producto/camiseta-sibu>:
      **en disputa** (paso 6).
 4. Pase a otra tienda o al marketplace.
    - **Debe seguir** con la sesión iniciada: una sola cuenta para todo Spora.
-   - Las tiendas solo la ven entre sus clientes (Admin UI → Clientes) si ya les compró: visitar o llenar el carrito
+   - Las tiendas solo la ven entre sus clientes (Panel Spora → Clientes) si ya les compró: visitar o llenar el carrito
      no comparte sus datos.
 
 ## 4. Comprar en cada tienda
@@ -101,14 +101,14 @@ Use una ventana privada para comprar sin cuenta, o siga con el cliente de prueba
   se envían como formularios.
 
 ## 5. El comercio atiende el pedido (Barro y Telar)
-1. <http://localhost:3000/admin>: ingrese como `barro@spora.localhost` / `barro1234`.
+1. <http://localhost:3000/dashboard>: ingrese como `barro@spora.localhost` / `barro1234`.
    - **Debe ver** solo su tienda: pedidos, productos y configuración de Barro y Telar, nada de las otras.
 2. **Pedidos** → el pedido del Plato Hondo.
    - En "Comprobante de pago" **debe ver** la imagen que subió el cliente.
    - Liquide el pago: el pedido pasa a **Pagado**.
 3. **Preparar envío** con Correos.
    - **Debe ver** una guía simulada.
-4. Para avanzar el rastreo sin transportista real, abra <http://localhost:3000/admin-api> (misma sesión del Admin UI).
+4. Para avanzar el rastreo sin transportista real, abra <http://localhost:3000/admin-api> (misma sesión del Panel Spora).
    1. Agregue el header `{"vendure-token": "barro-telar"}`.
    2. Busque el id del envío:
       ```graphql
@@ -119,19 +119,18 @@ Use una ventana privada para comprar sin cuenta, o siga con el cliente de prueba
       mutation { simulateShipmentEvent(fulfillmentId: "<id>", event: "en_camino") }
       mutation { simulateShipmentEvent(fulfillmentId: "<id>", event: "entregado") }
       ```
-   - **Debe ver** el pedido **Entregado**, en el Admin UI y en la cuenta del cliente.
+   - **Debe ver** el pedido **Entregado**, en el Panel Spora y en la cuenta del cliente.
    - Con `devuelto`, el pedido se cancela y la contra entrega no se cobra.
    - En tiendas con "Mensajería con rastreo" (TrackingApp), cada evento llega como **webhook firmado** al endpoint de la
      tienda, igual que en producción.
 
-**Otras pantallas del comercio en el Admin UI:**
-- **<http://localhost:3000/panel/tienda>** (misma sesión): estilo, color, tipografía, logo, textos, políticas y
-  credenciales de TrackingApp. Al guardar, la tienda cambia enseguida.
+**Otras pantallas del comercio en el Panel Spora:**
+- **Mi tienda** (menú lateral): estilo, color, tipografía, logo, textos, políticas y credenciales de TrackingApp. Al
+  guardar, la tienda cambia enseguida.
 - **Configuración → Métodos de pago / de envío**: cada proveedor y sus credenciales, que se guardan cifradas.
 
 ## 6. Comisiones
-1. <http://localhost:3000/panel/comisiones> con la sesión del comercio (ingrese al Admin UI como
-   `demo@spora.localhost`).
+1. Panel Spora → **Comisiones**, como `demo@spora.localhost`.
    - **Debe ver** el mes en curso de Tienda Demo:
      - la Camiseta Sibú del cliente de prueba como **facturable**, al 8 %;
      - la Gorra devuelta como **anulada**;
@@ -151,7 +150,7 @@ Use una ventana privada para comprar sin cuenta, o siga con el cliente de prueba
      **facturado**.
 
 ## 7. Lo que hace el admin de Spora
-Como `superadmin` en el Admin UI y en la Admin API:
+Como `superadmin` en el Panel Spora y en la Admin API:
 - **Vendedores**: cada tienda con su estado. Pasar una tienda a `suspendido` hace que su dominio responda 403 y que
   sus productos salgan del marketplace.
 - **Marcas**: la marca "Artesanías del Sur" está **propuesta** y no aparece en el marketplace hasta aprobarla

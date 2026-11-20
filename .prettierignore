@@ -7,3 +7,5 @@ dist
 apps/backend/static
 apps/backend/src/migrations
 apps/storefront/public/cliente.js
+apps/backend/src/gql
+apps/backend/.vendure-dashboard-temp

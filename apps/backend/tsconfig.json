@@ -7,5 +7,6 @@
     "useDefineForClassFields": false,
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/**/dashboard/**", "src/gql/**"]
 }

@@ -1,12 +1,13 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AssetServerPlugin } from "@vendure/asset-server-plugin";
-import { AdminUiPlugin } from "@vendure/admin-ui-plugin";
+import { DashboardPlugin } from "@vendure/dashboard/plugin";
 import { DefaultJobQueuePlugin, DefaultSchedulerPlugin, type VendureConfig } from "@vendure/core";
 import { AccountPlugin } from "./plugins/account/account.plugin";
 import { CatalogPlugin } from "./plugins/catalog/catalog.plugin";
 import { CommissionsPlugin } from "./plugins/commissions/commissions.plugin";
 import { MarketplacePlugin } from "./plugins/marketplace/marketplace.plugin";
+import { PanelPlugin } from "./plugins/panel/panel.plugin";
 import { CurrencyPlugin } from "./plugins/currency/currency.plugin";
 import { PaymentsPlugin } from "./plugins/payments/payments.plugin";
 import { ShippingPlugin } from "./plugins/shipping/shipping.plugin";
@@ -16,7 +17,10 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 const env = (name: string, devDefault: string): string => {
   const value = process.env[name];
   if (value) return value;
-  if (process.env.NODE_ENV === "production") throw new Error(`Falta la variable de entorno ${name}`);
+  // La compilación del Panel Spora (vite build, con NODE_ENV=production) solo lee la config para sacar el esquema.
+  if (process.env.NODE_ENV === "production" && !process.env.SPORA_DASHBOARD_BUILD) {
+    throw new Error(`Falta la variable de entorno ${name}`);
+  }
   return devDefault;
 };
 // Telemetría anónima de Vendure apagada también sin .env (un clon recién hecho no tiene .env).
@@ -66,8 +70,10 @@ export const config: VendureConfig = {
     }),
     DefaultJobQueuePlugin.init({}),
     DefaultSchedulerPlugin.init(),
-    // Panel del comercio y admin de Spora (MVP.md): el Admin UI de Vendure, con roles por canal.
-    AdminUiPlugin.init({ route: "admin", port: Number(env("ADMIN_UI_PORT", "3002")) }),
+    // Panel Spora (ADR 0007): el Vendure Dashboard con roles por canal. Compilado en dist/dashboard; en desarrollo,
+    // DashboardPlugin le hace de proxy al Vite de `pnpm dev` (puerto 5173).
+    DashboardPlugin.init({ route: "dashboard", appDir: path.join(dir, "../dist/dashboard") }),
+    PanelPlugin,
     SellersPlugin,
     CatalogPlugin,
     CurrencyPlugin,

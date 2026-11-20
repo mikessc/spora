@@ -15,6 +15,19 @@ const ok = (name) => results.push(`✔ ${name}`);
 const filterOption = (page, name) =>
   page.locator(".filters__option", { has: page.locator(".filters__label", { hasText: new RegExp(`^${name}$`) }) });
 
+/** Entra al Panel Spora (Vendure Dashboard) por su formulario. La primera visita compila el panel: tiempos largos. */
+async function panelAs(username, password) {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+  page.setDefaultTimeout(90_000);
+  await page.goto("http://localhost:3000/dashboard/login");
+  await page.fill('input[name="username"], input[type="text"]', username);
+  await page.fill('input[type="password"]', password);
+  await page.click('button[type="submit"]');
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+  return { context, page };
+}
+
 /**
  * La hidratación no cambia nada visible. Foto del DOM al terminar el parseo (antes de los scripts defer); al final de
  * cada lote de mutaciones —como mucho una tarea, y el navegador no pinta a mitad de una tarea— el DOM debe ser
@@ -583,57 +596,33 @@ try {
   await mk.close();
   ok("Cuenta Spora en el marketplace: ingreso y pedidos con enlace a cada tienda");
 
-  // Panel de comisiones del comercio: misma sesión que el Admin UI (se ingresa por la Admin API desde el navegador).
-  const panel = await browser.newContext({ viewport });
-  const pc = await panel.newPage();
-  await pc.goto("http://localhost:3000/panel/comisiones");
-  await pc.evaluate(() =>
-    fetch("/admin-api", {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        query: 'mutation { login(username: "demo@spora.localhost", password: "demo1234") { __typename } }',
-      }),
-    }),
-  );
-  await pc.reload();
-  await pc.locator("#movimientos tr").first().waitFor();
-  assert.match(await text(pc.locator("#quien")), /tienda tienda-demo/);
-  const movements = await pc.locator("#movimientos tr").allTextContents();
-  const delivered = movements.find((m) => m.includes(shippedOrder)) ?? "";
-  assert.match(delivered.replace(/\s+/g, " "), /facturable.*₡5 752,21.*8 %.*₡460,18/); // gorra ₡6 500 con IVA → ₡5 752,21 sin IVA, al 8 %
-  assert.match(await text(pc.locator("#totales")), /CRC/);
+  // Panel Spora (Vendure Dashboard) como comercio: comisiones y "Mi tienda"; nada de las pantallas de Spora.
+  const { context: panel, page: pc } = await panelAs("demo@spora.localhost", "demo1234");
+  assert.equal(await pc.title().then((t) => t.endsWith("Panel Spora")), true, await pc.title());
+  assert.equal(await pc.locator("nav, [data-sidebar]").getByText("Disputas").count(), 0);
+  await pc.goto("http://localhost:3000/panel/comisiones"); // la dirección vieja redirige
+  await pc.waitForURL(/\/dashboard\/comisiones/);
+  const movement = pc.locator("#movimientos tr", { hasText: shippedOrder });
+  await movement.waitFor();
+  assert.match(await text(movement), /Facturable.*₡5 752,21.*8 %.*₡460,18/); // gorra ₡6 500 con IVA → ₡5 752,21 sin IVA, al 8 %
   // Lo pendiente sin entrega confirmada, con la fecha desde la que el cierre lo factura igual.
-  assert.match(await text(pc.locator("#por-cierre tr").first()), /\d{1,2}\/\d{1,2}\/\d{4}.*₡/);
+  assert.match(await text(pc.locator("#por-cierre tbody tr").first()), /\d{1,2}\/\d{1,2}\/\d{4}.*₡/);
   const [download] = await Promise.all([pc.waitForEvent("download"), pc.click("#csv")]);
   assert.match(download.suggestedFilename(), /^comisiones-\d{4}-\d{2}\.csv$/);
-  await panel.close();
   ok(
-    "panel de comisiones: el comercio ve su pedido entregado como facturable (8 % sin IVA), lo que se facturará al cierre, y exporta el CSV",
+    "Panel Spora, comisiones: el comercio ve su pedido entregado como facturable (8 % sin IVA), lo que se facturará al cierre, y exporta el CSV",
   );
 
-  // El comercio edita su tienda en /panel/tienda (updateStoreSettings; ya no tiene updateChannel).
-  const themePanel = await browser.newContext({ viewport });
-  const pt = await themePanel.newPage();
-  await pt.goto("http://localhost:3000/panel/tienda");
-  await pt.evaluate(() =>
-    fetch("/admin-api", {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        query: 'mutation { login(username: "demo@spora.localhost", password: "demo1234") { __typename } }',
-      }),
-    }),
-  );
-  await pt.reload();
-  await pt.locator("#tienda:not([hidden])").waitFor();
-  const originalTagline = await pt.inputValue('[name="tagline"]');
-  const save = async (tagline) => {
-    await pt.fill('[name="tagline"]', tagline);
-    await pt.click("#tienda .primary");
-    await pt.locator("#listo", { hasText: "Guardado" }).waitFor();
+  // "Mi tienda" (updateStoreSettings; el comercio ya no tiene updateChannel).
+  await pc.goto("http://localhost:3000/dashboard/mi-tienda");
+  const tagline = pc.locator("#tagline");
+  await tagline.waitFor();
+  await pc.waitForFunction(() => document.querySelector("#tagline")?.value);
+  const originalTagline = await tagline.inputValue();
+  const save = async (value) => {
+    await tagline.fill(value);
+    await pc.click('#mi-tienda button[type="submit"]');
+    await pc.getByText("Guardado. Los cambios ya se ven en la tienda.").last().waitFor();
   };
   await save("Frase de prueba del panel");
   const hero = await browser.newPage();
@@ -641,8 +630,8 @@ try {
   assert.match(await text(hero.locator(".store-hero")), /Frase de prueba del panel/);
   await hero.close();
   await save(originalTagline);
-  await themePanel.close();
-  ok("panel de la tienda: el comercio cambia la frase con updateStoreSettings y la tienda la muestra");
+  await panel.close();
+  ok("Panel Spora, Mi tienda: el comercio cambia la frase con updateStoreSettings y la tienda la muestra");
   // ── M7: compras en las cuatro tiendas ──────────────────────────────────────────────────────────────────────────
   const BARRO = STORE.replace("tienda-demo", "barro-telar");
   const VOLTIO = STORE.replace("tienda-demo", "voltio");
@@ -770,20 +759,8 @@ try {
   assert.match(await text(question(disputedOrder)), /no recibió el pedido/);
   await receiver.close();
 
-  const sporaPanel = await browser.newContext({ viewport });
-  const ps2 = await sporaPanel.newPage();
-  await ps2.goto("http://localhost:3000/panel/comisiones");
-  await ps2.evaluate(() =>
-    fetch("/admin-api", {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        query: 'mutation { login(username: "superadmin", password: "superadmin") { __typename } }',
-      }),
-    }),
-  );
-  await ps2.reload();
+  const { context: sporaPanel, page: ps2 } = await panelAs("superadmin", "superadmin");
+  await ps2.goto("http://localhost:3000/dashboard/disputas");
   await ps2.locator("#disputas tr", { hasText: disputedOrder }).waitFor();
   await sporaPanel.close();
   ok(

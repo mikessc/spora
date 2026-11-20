@@ -1,0 +1,11 @@
+# Textos del Vendure Dashboard que el Panel Spora reemplaza (se fusionan después de los del Dashboard).
+msgid ""
+msgstr ""
+"Language: es\n"
+"Content-Type: text/plain; charset=utf-8\n"
+
+msgid "Welcome to Vendure"
+msgstr "Panel Spora"
+
+msgid "Sign in to access the admin dashboard"
+msgstr "Ingrese con el usuario de su tienda o de Spora"

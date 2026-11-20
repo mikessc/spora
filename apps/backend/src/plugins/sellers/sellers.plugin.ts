@@ -1,14 +1,4 @@
-import { readFileSync } from "node:fs";
-import {
-  Controller,
-  Get,
-  Header,
-  Inject,
-  Injectable,
-  type MiddlewareConsumer,
-  type NestMiddleware,
-  type NestModule,
-} from "@nestjs/common";
+import { Inject, Injectable, type MiddlewareConsumer, type NestMiddleware, type NestModule } from "@nestjs/common";
 import { Args, Mutation, Resolver } from "@nestjs/graphql";
 import {
   Allow,
@@ -136,25 +126,11 @@ class StoreAdminResolver {
   }
 }
 
-/** Página del comercio para editar su tienda (como el panel de comisiones: misma sesión que el Admin UI). */
-@Controller("panel")
-class StorePanelController {
-  private html = readFileSync(new URL("./panel-tienda.html", import.meta.url), "utf8");
-
-  @Get("tienda")
-  @Header("content-type", "text/html; charset=utf-8")
-  @Header("cache-control", "no-store")
-  page() {
-    return this.html;
-  }
-}
-
 /** Comercios y tiendas: alta, estados (`pendiente`, `activo`, `suspendido`) y bloqueo de tiendas no activas. */
 @VendurePlugin({
   imports: [PluginCommonModule],
   providers: [StoreService],
   exports: [StoreService],
-  controllers: [StorePanelController],
   adminApiExtensions: { schema: adminApi, resolvers: [StoreAdminResolver] },
   configuration: (config) => {
     config.authOptions.customPermissions.push(updateStoreSettingsPermission);
@@ -167,8 +143,8 @@ class StorePanelController {
       options: sellerStatuses.map((value) => ({ value, label: es(value) })),
       requiresPermission: Permission.SuperAdmin,
     });
-    // El tema y los textos de la tienda (ADR 0005). El comercio los edita en /panel/tienda (updateStoreSettings); en
-    // el Admin UI los ve, pero solo el admin de Spora guarda el canal.
+    // El tema y los textos de la tienda (ADR 0005). El comercio los edita en "Mi tienda" del Panel Spora
+    // (updateStoreSettings); solo el admin de Spora guarda el canal.
     const tab = { tab: "Tienda" };
     const text = (name: string, label: string, ui: Record<string, unknown> = tab) =>
       ({ name, type: "text", nullable: true, label: es(label), ui }) as const;

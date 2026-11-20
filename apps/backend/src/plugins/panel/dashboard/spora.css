@@ -1,0 +1,23 @@
+/*
+ * Marca del Panel Spora sobre el Vendure Dashboard. El Dashboard no tiene un lugar para el logo en la barra lateral:
+ * va como fondo del encabezado, con el nombre al lado. Para cambiar el logo, reemplazar logo.svg (ADR 0007).
+ */
+[data-sidebar="header"]::before {
+  content: "Panel Spora";
+  display: block;
+  padding: 0.6rem 0.5rem 0.6rem 2.6rem;
+  background: url("./logo.svg") no-repeat 0.5rem center / 1.75rem 1.75rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.75rem;
+  color: var(--sidebar-foreground);
+  white-space: nowrap;
+}
+
+/* Barra colapsada: solo el brote. */
+[data-collapsible="icon"] [data-sidebar="header"]::before {
+  content: "";
+  padding: 0;
+  height: 1.75rem;
+  background-position: center;
+}

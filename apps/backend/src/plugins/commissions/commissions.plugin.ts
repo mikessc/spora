@@ -1,5 +1,4 @@
-import { readFileSync } from "node:fs";
-import { Controller, Get, Header, Inject } from "@nestjs/common";
+import { Inject } from "@nestjs/common";
 import { Args, Mutation, Query, Resolver } from "@nestjs/graphql";
 import {
   Allow,
@@ -69,29 +68,12 @@ class CommissionAdminResolver {
   }
 }
 
-/**
- * Panel de comisiones (comercio y admin de Spora). Página estática en el mismo origen que el Admin UI: usa su sesión
- * y consulta la Admin API desde el navegador.
- */
-@Controller("panel")
-class CommissionPanelController {
-  private html = readFileSync(new URL("./panel.html", import.meta.url), "utf8");
-
-  @Get("comisiones")
-  @Header("content-type", "text/html; charset=utf-8")
-  @Header("cache-control", "no-store")
-  page() {
-    return this.html;
-  }
-}
-
 /** Comisiones (PLAN §5, M6): acuerdos con vigencias, un movimiento por pedido y estado de cuenta mensual. */
 @VendurePlugin({
   imports: [PluginCommonModule],
   entities: [CommissionAgreement, CommissionEntry, CommissionInvoice],
   providers: [CommissionService],
   exports: [CommissionService],
-  controllers: [CommissionPanelController],
   adminApiExtensions: {
     schema: gql`
       type CommissionAgreement {

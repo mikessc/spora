@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "seed": "tsx --env-file-if-exists=.env src/seed.ts",
-    "dev": "tsx --env-file-if-exists=.env src/index.ts",
+    "dev": "node scripts/dev.mjs",
     "migration:generate": "tsx --env-file-if-exists=.env src/migrate.ts",
-    "typecheck": "tsc -p tsconfig.json",
-    "test": "tsx --test --test-concurrency=1 \"src/**/*.test.ts\""
+    "typecheck": "tsc -p tsconfig.json && node scripts/typecheck-dashboard.mjs",
+    "test": "tsx --test --test-concurrency=1 \"src/**/*.test.ts\"",
+    "build": "tsx ./node_modules/vite/bin/vite.js build"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
@@ -16,23 +17,31 @@
     "@spora/api-client": "workspace:^",
     "@spora/shared": "workspace:*",
     "@spora/themes": "workspace:*",
-    "@vendure/admin-ui-plugin": "3.8.2",
+    "@tanstack/react-query": "5.108.1",
     "@vendure/asset-server-plugin": "3.8.2",
     "@vendure/common": "3.8.2",
     "@vendure/core": "3.8.2",
+    "@vendure/dashboard": "3.8.2",
     "express": "^5.1.0",
     "graphql": "^16.14.2",
     "graphql-tag": "^2.12.6",
+    "lucide-react": "0.577.0",
     "meilisearch": "^0.53.0",
     "pg": "^8.16.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "typeorm": "^0.3.21"
   },
   "devDependencies": {
+    "@graphql-typed-document-node/core": "3.2.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.15.0",
+    "@types/react": "19.3.0",
     "@vendure/testing": "3.8.2",
+    "gql.tada": "1.11.5",
     "rimraf": "^6.0.0",
     "sql.js": "1.14.2",
-    "tsx": "^4.20.0"
+    "tsx": "^4.20.0",
+    "vite": "7.3.8"
   }
 }
