@@ -793,10 +793,23 @@ try {
 
   const { context: sporaPanel, page: ps2 } = await panelAs("superadmin", "superadmin");
   await ps2.goto("http://localhost:3000/dashboard/disputas");
-  await ps2.locator("#disputas tr", { hasText: disputedOrder }).waitFor();
+  const dispute = ps2.locator("#disputas tr", { hasText: disputedOrder });
+  await dispute.waitFor();
+  // Se resuelve con nota obligatoria: sin nota, los botones no se habilitan.
+  assert.ok(await dispute.getByRole("button", { name: "Se entregó", exact: true }).isDisabled());
+  await dispute.getByRole("textbox").fill("La tienda mostró la firma del retiro");
+  await dispute.getByRole("button", { name: "Se entregó", exact: true }).click();
+  await ps2.getByText(`Pedido ${disputedOrder}: entregado`).first().waitFor();
+  await dispute.waitFor({ state: "detached" });
   await sporaPanel.close();
+  const { data: resolved } = await adminApi(
+    `query ($code: String!) { orders(options: { filter: { code: { eq: $code } } }) { items { state } } }`,
+    { code: disputedOrder },
+    merchant,
+  );
+  assert.equal(resolved.orders.items[0].state, "Delivered");
   ok(
-    `¿Recibiste tu pedido? sin JS: ${receivedOrder} confirmado (entregado); ${disputedOrder} no recibido, en "Pedidos en disputa" del panel de Spora`,
+    `¿Recibiste tu pedido? sin JS: ${receivedOrder} confirmado (entregado); ${disputedOrder} no recibido, en "Disputas" del Panel Spora, que la resuelve (se entregó) con nota`,
   );
 } finally {
   await browser.close();

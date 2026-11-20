@@ -82,7 +82,9 @@ curl sin configurar nada.
   transportista, la tienda o el cliente con "¿Recibiste tu pedido?" en su cuenta). El panel muestra el mes en curso; el
   admin de Spora cierra el mes ("Cerrar el mes") y edita los acuerdos.
 - Al cerrar el mes, lo pendiente con `SPORA_DIAS_GRACIA_CIERRE` días o más (7) se factura igual, marcado "facturado al
-  cierre sin confirmar entrega". Si el cliente dijo "No lo recibí", queda **en disputa** y no se factura.
+  cierre sin confirmar entrega". Si el cliente dijo "No lo recibí", queda **en disputa** y no se factura hasta que el admin de Spora la
+  resuelve en Panel Spora → Spora → **Disputas**, con una nota obligatoria: "Se entregó" (entregado, comisión
+  facturable) o "No se entregó" (pedido cancelado, comisión anulada).
 - El índice del marketplace se reconstruye al arrancar Vendure y lo mantienen los eventos. Para forzarlo: Admin API,
   `reindexMarketplace` (superadmin).
 

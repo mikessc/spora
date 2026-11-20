@@ -145,6 +145,8 @@ Use una ventana privada para comprar sin cuenta, o siga con el cliente de prueba
 3. Ingrese como `superadmin`.
    - **Debe ver** todas las tiendas y sus acuerdos, con el porcentaje vigente editable desde una fecha.
    - **"Pedidos en disputa"**: los Audífonos de Voltio si el cliente dijo que no los recibió (paso 3). No se facturan.
+     Escriba una nota (obligatoria) y elija **"Se entregó"** (el pedido pasa a entregado y su comisión a facturable)
+     o **"No se entregó"** (se cancela el pedido y se anula la comisión). La nota queda en el historial del pedido.
    - **Cerrar el mes**: lo pendiente con 7 días o más (y sin cancelar ni en disputa) pasa a facturable con la marca
      "facturado al cierre sin confirmar entrega"; después todo lo facturable se agrupa por tienda y moneda y queda
      **facturado**.

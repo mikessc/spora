@@ -93,7 +93,8 @@ function RegisterPage({ error, values, back }: { error?: string; values: Record<
 
 /** "¿Recibiste tu pedido?" con dos formularios (funciona sin JS); o el aviso si dijo que no lo recibió. */
 function deliveryRow(o: OrderSummary) {
-  if (o.deliveryReport === "no-recibido") {
+  // Mientras Spora no resuelva la disputa (después el estado dice Entregado o Cancelado).
+  if (o.deliveryReport === "no-recibido" && o.state !== "Delivered" && o.state !== "Cancelled") {
     return tr("account__delivery", [
       td({ colspan: "6" }, `Nos dijo que no recibió el pedido ${o.code}: Spora lo está revisando con la tienda.`),
     ]);

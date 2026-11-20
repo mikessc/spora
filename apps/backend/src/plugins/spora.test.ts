@@ -1448,6 +1448,48 @@ describe("entrega confirmada por el cliente y cierre con días de gracia", () =>
     assert.equal((await entries().findOneBy({ orderCode: code }))?.status, "en_disputa");
   });
 
+  test("disputas: el admin de Spora las resuelve con nota obligatoria; el comercio no puede", async () => {
+    const RESOLVE = gql`
+      mutation ($id: ID!, $delivered: Boolean!, $note: String!) {
+        resolveDeliveryDispute(orderId: $id, delivered: $delivered, note: $note)
+      }
+    `;
+    const shipped = await placeOrder("Envío a domicilio");
+    await ship(shipped);
+    const pickup = await placeOrder("Retiro en local"); // sin guía: "no se entregó" lo cancela directo
+    for (const code of [shipped, pickup]) {
+      await shopClient.query(REPORT, { code, received: false });
+      await entryWhen(code, "en_disputa");
+    }
+    const idOf = async (code: string) => (await entries().findOneByOrFail({ orderCode: code })).orderId;
+
+    await adminClient.asUserWithCredentials(admin.emailAddress, admin.password);
+    adminClient.setChannelToken("cafe-sur");
+    try {
+      await assert.rejects(
+        adminClient.query(RESOLVE, { id: await idOf(shipped), delivered: true, note: "Lo entregué" }),
+        /not currently authorized/,
+      );
+    } finally {
+      adminClient.setChannelToken(DEFAULT_TOKEN);
+      await adminClient.asSuperAdmin();
+    }
+
+    await assert.rejects(adminClient.query(RESOLVE, { id: await idOf(shipped), delivered: true, note: " " }), /nota/);
+    const note = "El courier tiene la firma del cliente";
+    await adminClient.query(RESOLVE, { id: await idOf(shipped), delivered: true, note });
+    assert.equal((await myOrder(shipped)).state, "Delivered");
+    await entryWhen(shipped, "facturable");
+
+    await adminClient.query(RESOLVE, { id: await idOf(pickup), delivered: false, note: "La tienda no lo entregó" });
+    assert.equal((await myOrder(pickup)).state, "Cancelled");
+    await entryWhen(pickup, "anulado");
+    await assert.rejects(
+      adminClient.query(RESOLVE, { id: await idOf(pickup), delivered: true, note: "Otra vez" }),
+      /no está en disputa/,
+    );
+  });
+
   test("cierre: pendiente de hace 10 días sin entregar → facturado sin confirmar entrega; uno de hoy espera", async () => {
     const old = await placeOrder("Envío a domicilio");
     const recent = await placeOrder("Envío a domicilio");

@@ -16,7 +16,7 @@ import {
 import { DEFAULT_CHANNEL_CODE } from "@vendure/common/lib/shared-constants";
 import { businessDate, type CurrencyCode } from "@spora/shared";
 import { Column, Entity, In, IsNull } from "typeorm";
-import { DeliveryDisputeEvent } from "../shipping/events";
+import { DeliveryDisputeEvent, DeliveryDisputeResolvedEvent } from "../shipping/events";
 import {
   agreementOn,
   billableAtCloseFrom,
@@ -103,6 +103,11 @@ export class CommissionService implements OnApplicationBootstrap {
     this.events
       .ofType(DeliveryDisputeEvent)
       .subscribe((e) => safely("disputa", () => this.onDisputed(e.ctx, e.orderId)));
+    this.events
+      .ofType(DeliveryDisputeResolvedEvent)
+      .subscribe((e) =>
+        safely("disputa resuelta", () => this.onDisputeResolved(e.ctx, e.orderId, e.delivered, new Date())),
+      );
   }
 
   async agreements(ctx: RequestContext, sellerId: ID) {
@@ -184,6 +189,16 @@ export class CommissionService implements OnApplicationBootstrap {
     await this.connection
       .getRepository(ctx, CommissionEntry)
       .update({ orderId: Number(orderId), status: "pendiente" }, { status: "en_disputa" });
+  }
+
+  /** Spora resolvió la disputa: se entregó → facturable en el mes de la resolución; no se entregó → anulado. */
+  async onDisputeResolved(ctx: RequestContext, orderId: ID, delivered: boolean, at: Date) {
+    await this.connection
+      .getRepository(ctx, CommissionEntry)
+      .update(
+        { orderId: Number(orderId), status: "en_disputa" },
+        delivered ? { status: "facturable", billableAt: at, billingMonth: billingMonth(at) } : { status: "anulado" },
+      );
   }
 
   /**

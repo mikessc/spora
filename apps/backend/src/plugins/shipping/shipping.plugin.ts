@@ -1,6 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { Controller, Headers, HttpCode, Inject, Injectable, Param, Post, Req, Res } from "@nestjs/common";
 import { Args, Mutation, Resolver } from "@nestjs/graphql";
+import { HistoryEntryType } from "@vendure/common/lib/generated-types";
 import { DEFAULT_CHANNEL_CODE } from "@vendure/common/lib/shared-constants";
 import {
   Allow,
@@ -10,6 +11,8 @@ import {
   EventBus,
   ForbiddenError,
   Fulfillment,
+  HistoryService,
+  type ID,
   idsAreEqual,
   LanguageCode,
   manualFulfillmentHandler,
@@ -39,7 +42,7 @@ import {
 } from "typeorm";
 import { canConfirmDelivery, type DeliveryReport } from "@spora/shared";
 import { decrypt, encrypt } from "../payments/secrets";
-import { DeliveryDisputeEvent } from "./events";
+import { DeliveryDisputeEvent, DeliveryDisputeResolvedEvent } from "./events";
 import { correosCalculator, correosFulfillment, trackingAppFulfillment, zoneRateCalculator } from "./providers";
 
 declare module "@vendure/core/dist/entity/custom-entity-fields" {
@@ -193,29 +196,116 @@ export class DeliveryReportService {
     @Inject(OrderService) private orders: OrderService,
     @Inject(ShipmentEventsService) private shipments: ShipmentEventsService,
     @Inject(EventBus) private events: EventBus,
+    @Inject(HistoryService) private history: HistoryService,
   ) {}
 
-  async report(ctx: RequestContext, orderCode: string, received: boolean) {
-    const order = ctx.activeUserId
-      ? await this.connection.rawConnection.getRepository(Order).findOne({
-          where: { code: orderCode },
-          relations: {
-            customer: { user: true },
-            channels: true,
-            lines: true,
-            fulfillments: true,
-            shippingLines: { shippingMethod: true },
+  private load(where: { code: string } | { id: ID }) {
+    return this.connection.rawConnection.getRepository(Order).findOne({
+      where,
+      relations: {
+        customer: { user: true },
+        channels: true,
+        lines: true,
+        payments: true,
+        fulfillments: true,
+        shippingLines: { shippingMethod: true },
+      },
+    });
+  }
+
+  private async storeContext(order: Order) {
+    const store = order.channels.find((c) => c.code !== DEFAULT_CHANNEL_CODE)!;
+    return this.contexts.create({ apiType: "admin", channelOrToken: store.token });
+  }
+
+  /** La guía del pedido; un retiro (o un pedido que nunca se despachó) recibe una manual. */
+  private async fulfillmentOf(tx: RequestContext, order: Order) {
+    const existing = order.fulfillments.find((f) => f.state !== "Cancelled");
+    if (existing) return existing;
+    const created = await this.orders.createFulfillment(tx, {
+      lines: order.lines.map((l) => ({ orderLineId: l.id, quantity: l.quantity })),
+      handler: {
+        code: manualFulfillmentHandler.code,
+        arguments: [
+          { name: "method", value: isPickup(order) ? "Retiro en local" : "Entrega" },
+          { name: "trackingCode", value: "" },
+        ],
+      },
+    });
+    if (!("id" in created)) throw new UserInputError(created.message);
+    return created;
+  }
+
+  /**
+   * El admin de Spora resuelve una disputa, con una nota obligatoria que queda en el historial del pedido. "Se entregó":
+   * entregado por el mismo servicio (la comisión pasa a facturable). "No se entregó": se cancela el pedido (la contra
+   * entrega no se cobra) y la comisión se anula.
+   */
+  async resolveDispute(orderId: ID, delivered: boolean, note: string) {
+    if (note.trim().length < 3) throw new UserInputError("Escriba una nota con lo que se averiguó");
+    const order = await this.load({ id: orderId });
+    if (
+      !order ||
+      order.customFields.customerDeliveryReport !== "no-recibido" ||
+      order.state === "Delivered" ||
+      order.state === "Cancelled"
+    ) {
+      throw new UserInputError("Ese pedido no está en disputa");
+    }
+    const storeCtx = await this.storeContext(order);
+    await this.connection.withTransaction(storeCtx, async (tx) => {
+      await this.history.createHistoryEntryForOrder(
+        {
+          ctx: tx,
+          orderId: order.id,
+          type: HistoryEntryType.ORDER_NOTE,
+          data: {
+            note: `Disputa de entrega resuelta por Spora (${delivered ? "se entregó" : "no se entregó"}): ${note.trim()}`,
           },
-        })
-      : null;
+        },
+        false,
+      );
+      if (delivered) {
+        const fulfillment = await this.fulfillmentOf(tx, order);
+        await this.shipments.apply(tx, {
+          provider: "spora",
+          eventId: `disputa-${order.id}`,
+          kind: "entregado",
+          status: "Entrega confirmada por Spora",
+          fulfillmentId: fulfillment.id,
+        });
+      } else {
+        const fulfillment = order.fulfillments.find((f) => f.state !== "Cancelled");
+        if (fulfillment) {
+          await this.shipments.apply(tx, {
+            provider: "spora",
+            eventId: `disputa-${order.id}`,
+            kind: "cancelado",
+            status: "No se entregó (Spora)",
+            fulfillmentId: fulfillment.id,
+          });
+        } else {
+          const cancelled = await this.orders.cancelOrder(tx, { orderId: order.id, reason: note.trim() });
+          if ("errorCode" in cancelled) throw new UserInputError(cancelled.message);
+          for (const payment of order.payments.filter((p) => p.state === "Authorized")) {
+            await this.orders.cancelPayment(tx, payment.id);
+          }
+        }
+      }
+      await this.events.publish(new DeliveryDisputeResolvedEvent(tx, order.id, delivered));
+    });
+    return true;
+  }
+
+  async report(ctx: RequestContext, orderCode: string, received: boolean) {
+    const order = ctx.activeUserId ? await this.load({ code: orderCode }) : null;
     // Mismo error si no existe o es de otro: no se revela qué pedidos existen.
     if (!order?.customer?.user || !idsAreEqual(order.customer.user.id, ctx.activeUserId!)) throw new ForbiddenError();
     const pickup = isPickup(order);
     if (!canConfirmDelivery({ state: order.state, pickup, report: order.customFields.customerDeliveryReport })) {
       throw new UserInputError("Este pedido no espera confirmación de entrega");
     }
-    const store = order.channels.find((c) => c.code !== DEFAULT_CHANNEL_CODE)!;
-    const storeCtx = await this.contexts.create({ apiType: "admin", channelOrToken: store.token });
+    const storeCtx = await this.storeContext(order);
     await this.connection.withTransaction(storeCtx, async (tx) => {
       const report: DeliveryReport = received ? "recibido" : "no-recibido";
       await this.connection
@@ -225,21 +315,7 @@ export class DeliveryReportService {
         await this.events.publish(new DeliveryDisputeEvent(tx, order.id));
         return;
       }
-      let fulfillment = order.fulfillments.find((f) => f.state !== "Cancelled");
-      if (!fulfillment) {
-        const created = await this.orders.createFulfillment(tx, {
-          lines: order.lines.map((l) => ({ orderLineId: l.id, quantity: l.quantity })),
-          handler: {
-            code: manualFulfillmentHandler.code,
-            arguments: [
-              { name: "method", value: pickup ? "Retiro en local" : "Entrega" },
-              { name: "trackingCode", value: "" },
-            ],
-          },
-        });
-        if (!("id" in created)) throw new UserInputError(created.message);
-        fulfillment = created;
-      }
+      const fulfillment = await this.fulfillmentOf(tx, order);
       // Idempotente por pedido: el cliente confirma una sola vez.
       await this.shipments.apply(tx, {
         provider: "cliente",
@@ -255,6 +331,21 @@ export class DeliveryReportService {
 
 /** Retiro en local: el método `<tienda>-retiro` que crea toda tienda. */
 export const isPickup = (order: Order) => order.shippingLines.some((l) => l.shippingMethod?.code.endsWith("-retiro"));
+
+@Resolver()
+class DisputeAdminResolver {
+  constructor(@Inject(DeliveryReportService) private reports: DeliveryReportService) {}
+
+  @Mutation()
+  @Allow(Permission.SuperAdmin)
+  resolveDeliveryDispute(
+    @Args("orderId") orderId: ID,
+    @Args("delivered") delivered: boolean,
+    @Args("note") note: string,
+  ) {
+    return this.reports.resolveDispute(orderId, delivered, note);
+  }
+}
 
 @Resolver()
 class DeliveryShopResolver {
@@ -452,9 +543,11 @@ class ShippingAdminResolver {
       extend type Mutation {
         "Simula un evento del transportista: en_camino, entregado, devuelto o cancelado."
         simulateShipmentEvent(fulfillmentId: ID!, event: String!): Boolean!
+        "Solo admin de Spora: resuelve un pedido en disputa. delivered=true lo entrega; false lo cancela. Nota obligatoria."
+        resolveDeliveryDispute(orderId: ID!, delivered: Boolean!, note: String!): Boolean!
       }
     `,
-    resolvers: [ShippingAdminResolver],
+    resolvers: [ShippingAdminResolver, DisputeAdminResolver],
   },
   configuration: (config) => {
     config.shippingOptions.shippingCalculators.push(zoneRateCalculator, correosCalculator);
