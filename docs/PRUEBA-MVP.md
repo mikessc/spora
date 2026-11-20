@@ -153,8 +153,11 @@ Use una ventana privada para comprar sin cuenta, o siga con el cliente de prueba
 Como `superadmin` en el Panel Spora y en la Admin API:
 - **Vendedores**: cada tienda con su estado. Pasar una tienda a `suspendido` hace que su dominio responda 403 y que
   sus productos salgan del marketplace.
-- **Marcas**: la marca "Artesanías del Sur" está **propuesta** y no aparece en el marketplace hasta aprobarla
-  (`approveBrand`).
+- **Spora → Marcas**: la marca "Artesanías del Sur" está **propuesta** y no aparece en el marketplace hasta
+  aprobarla. Desde ahí se aprueba, se rechaza (los productos que la usaban quedan sin marca) o se fusiona con un
+  duplicado.
+- En un producto (como comercio), **Categoría global** y **Marca** se eligen de una lista con búsqueda; escriba una
+  marca que no existe y aparece "Proponer la marca «…»".
 - **Alta de un comercio nuevo**: mutation `registerStore`. Crea canal, bodega, rol, usuario y los métodos de siempre
   (envío a domicilio, retiro y contra entrega).
 

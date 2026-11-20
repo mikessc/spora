@@ -630,8 +630,40 @@ try {
   assert.match(await text(hero.locator(".store-hero")), /Frase de prueba del panel/);
   await hero.close();
   await save(originalTagline);
-  await panel.close();
   ok("Panel Spora, Mi tienda: el comercio cambia la frase con updateStoreSettings y la tienda la muestra");
+
+  // Marca y categoría global del producto: se eligen de una lista con búsqueda; el comercio propone una marca nueva y
+  // el admin de Spora la ve en "Marcas" y la rechaza.
+  const { data: shirt } = await adminApi(
+    `{ products(options: { filter: { slug: { eq: "camiseta-sibu" } } }) { items { id } } }`,
+    {},
+    merchant,
+  );
+  pc.on("dialog", (dialog) => dialog.accept());
+  await pc.goto(`http://localhost:3000/dashboard/products/${shirt.products.items[0].id}`);
+  await pc.getByPlaceholder("Buscar categoría…").fill("camis");
+  await pc.getByRole("button", { name: "Moda › Hombre › Camisetas" }).waitFor();
+  await pc.getByPlaceholder("Buscar marca…").fill("volt");
+  await pc.getByRole("button", { name: "Voltio", exact: true }).waitFor();
+  const newBrand = `Marca e2e ${Date.now()}`;
+  await pc.getByPlaceholder("Buscar marca…").fill(newBrand);
+  await pc.getByRole("button", { name: `Proponer la marca «${newBrand}»` }).click();
+  await pc.getByText("Marca propuesta: Spora la revisa").first().waitFor();
+  await panel.close();
+  const { context: brandsPanel, page: pm2 } = await panelAs("superadmin", "superadmin");
+  pm2.on("dialog", (dialog) => dialog.accept());
+  await pm2.goto("http://localhost:3000/dashboard/marcas");
+  // La fila por el nombre de su primera celda (el nombre también aparece en las opciones de "Fusionar en…").
+  const brandRow = () =>
+    pm2.locator("#marcas tbody tr").filter({ has: pm2.locator("span.font-medium", { hasText: newBrand }) });
+  const proposed = brandRow();
+  assert.match(await text(proposed.locator("td").nth(1)), /propuesta/);
+  await proposed.getByRole("button", { name: "Rechazar" }).click();
+  await pm2.getByText("Marca rechazada").first().waitFor();
+  await pm2.getByRole("button", { name: /^Rechazadas/ }).click();
+  assert.match(await text(brandRow().locator("td").nth(1)), /rechazada/);
+  await brandsPanel.close();
+  ok("Panel Spora, marcas: categoría y marca con búsqueda en el producto; el comercio propone y Spora rechaza");
   // ── M7: compras en las cuatro tiendas ──────────────────────────────────────────────────────────────────────────
   const BARRO = STORE.replace("tienda-demo", "barro-telar");
   const VOLTIO = STORE.replace("tienda-demo", "voltio");

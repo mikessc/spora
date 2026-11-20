@@ -48,6 +48,7 @@ const brandUsable = async (value: string | null, injector: Injector) => {
     .findOneBy({ slug: value });
   if (!brand) return `La marca "${value}" no existe: propóngala primero`;
   if (brand.status === "fusionada") return `La marca "${value}" se fusionó en otra; use la vigente`;
+  if (brand.status === "rechazada") return `La marca "${value}" fue rechazada por Spora`;
 };
 
 const types = gql`
@@ -82,6 +83,8 @@ const adminApi = gql`
     createMarketplaceCategory(input: CreateMarketplaceCategoryInput!): MarketplaceCategory!
     proposeBrand(name: String!): Brand!
     approveBrand(id: ID!): Brand!
+    "Rechaza una marca: los productos que la usaban quedan sin marca."
+    rejectBrand(id: ID!): Brand!
     mergeBrands(sourceId: ID!, targetId: ID!): Brand!
   }
 `;
@@ -138,6 +141,13 @@ class CatalogAdminResolver {
   @Mutation()
   @Transaction()
   @Allow(Permission.SuperAdmin)
+  rejectBrand(@Ctx() ctx: RequestContext, @Args("id") id: ID) {
+    return this.catalog.rejectBrand(ctx, id);
+  }
+
+  @Mutation()
+  @Transaction()
+  @Allow(Permission.SuperAdmin)
   mergeBrands(@Ctx() ctx: RequestContext, @Args("sourceId") sourceId: ID, @Args("targetId") targetId: ID) {
     return this.catalog.mergeBrands(ctx, sourceId, targetId);
   }
@@ -176,18 +186,19 @@ class CatalogShopResolver {
         type: "string",
         nullable: true,
         label: es("Categoría global"),
-        description: es(
-          "Slug de la categoría del marketplace (p. ej. moda-hombre-camisetas). Obligatoria para publicar.",
-        ),
+        description: es("Categoría del marketplace. Obligatoria para publicar."),
         validate: categoryExists,
+        // Panel Spora: se elige de una lista con búsqueda (panel/dashboard/selectores.tsx).
+        ui: { component: "spora-categoria-global" },
       },
       {
         name: "brand",
         type: "string",
         nullable: true,
         label: es("Marca"),
-        description: es("Slug de una marca del catálogo de Spora. Si no existe, propóngala."),
+        description: es("Marca del catálogo de Spora. Si no está en la lista, propóngala desde aquí."),
         validate: brandUsable,
+        ui: { component: "spora-marca" },
       },
     );
     config.customFields.Collection.push({

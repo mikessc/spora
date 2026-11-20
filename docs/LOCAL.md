@@ -53,9 +53,10 @@ curl sin configurar nada.
 - **Dar de alta un comercio:** Admin API, como superadmin, mutation `registerStore` (crea comercio en estado
   `pendiente`, canal, bodega, rol y usuario). Para publicarla: Panel Spora → Configuración → Vendedores → Estado
   `activo`.
-- **Categorías globales y marcas:** Admin API, queries `marketplaceCategories` y `brands`; mutations
-  `createMarketplaceCategory`, `proposeBrand`, `approveBrand` y `mergeBrands`. En el producto se asignan por slug en
-  los campos "Categoría global" y "Marca".
+- **Categorías globales y marcas:** en el producto, "Categoría global" y "Marca" se eligen de una lista con
+  búsqueda; si la marca no está, el comercio la propone desde ahí. El admin de Spora las revisa en Panel Spora → Spora
+  → **Marcas** (aprobar, rechazar, fusionar duplicados). Las categorías se crean por la Admin API
+  (`createMarketplaceCategory`).
 - **Cambiar el esquema** (entidades o custom fields): `pnpm --filter @spora/backend migration:generate <nombre>` y
   commitear la migración de `apps/backend/src/migrations`.
 

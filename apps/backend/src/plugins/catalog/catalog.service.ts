@@ -43,6 +43,21 @@ export class CatalogService {
     return repo.save(brand);
   }
 
+  /**
+   * Spora rechaza una marca propuesta (o una aprobada por error): los productos que la usaban quedan sin marca. Se
+   * puede volver a aprobar.
+   */
+  async rejectBrand(ctx: RequestContext, id: ID): Promise<Brand> {
+    const repo = this.connection.getRepository(ctx, Brand);
+    const brand = await repo.findOneByOrFail({ id });
+    if (brand.status === "fusionada") throw new UserInputError("Una marca fusionada no se puede rechazar");
+    await this.connection
+      .getRepository(ctx, Product)
+      .update({ customFields: { brand: brand.slug } }, { customFields: { brand: null } });
+    brand.status = "rechazada";
+    return repo.save(brand);
+  }
+
   /** Fusiona `source` en `target`: los productos de todas las tiendas pasan a `target`. */
   async mergeBrands(ctx: RequestContext, sourceId: ID, targetId: ID): Promise<Brand> {
     const repo = this.connection.getRepository(ctx, Brand);

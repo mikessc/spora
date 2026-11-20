@@ -23,9 +23,9 @@ export class MarketplaceCategory extends VendureEntity {
   @Column("int", { default: 0 }) position!: number;
 }
 
-export type BrandStatus = "propuesta" | "aprobada" | "fusionada";
+export type BrandStatus = "propuesta" | "aprobada" | "rechazada" | "fusionada";
 
-/** Marca del catálogo global. La tienda propone; Spora aprueba o fusiona duplicados. */
+/** Marca del catálogo global. La tienda propone; Spora aprueba, rechaza o fusiona duplicados. */
 @Entity()
 export class Brand extends VendureEntity {
   constructor(input?: DeepPartial<Brand>) {

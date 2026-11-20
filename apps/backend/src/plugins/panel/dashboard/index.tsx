@@ -1,11 +1,13 @@
 // Panel Spora (ADR 0007): marca, menú y pantallas propias sobre el Vendure Dashboard.
 import { defineDashboardExtension, type NavMenuConfig, type NavMenuItem } from "@vendure/dashboard";
-import { HandshakeIcon, PercentIcon, ScaleIcon, SproutIcon, StoreIcon } from "lucide-react";
+import { HandshakeIcon, PercentIcon, ScaleIcon, SproutIcon, StoreIcon, TagIcon } from "lucide-react";
 import { AgreementsPage } from "./acuerdos";
 import { LoginLogo, SporaBranding } from "./branding";
 import { CommissionsPage } from "./comisiones";
 import { DisputesPage } from "./disputas";
+import { BrandsPage } from "./marcas";
 import { StoreSettingsPage } from "./mi-tienda";
+import { BrandSelect, CategorySelect } from "./selectores";
 
 const DEFAULT_CHANNEL = "__default_channel__";
 
@@ -52,6 +54,7 @@ function sporaNav(config: NavMenuConfig): NavMenuConfig {
         defaultOpen: true,
         isVisible: (ctx) => ctx.isSuperAdmin,
         items: [
+          { id: "marcas", title: "Marcas", url: "/marcas", icon: TagIcon },
           { id: "disputas", title: "Disputas", url: "/disputas", icon: ScaleIcon },
           { id: "acuerdos", title: "Acuerdos de comisión", url: "/acuerdos", icon: HandshakeIcon },
         ],
@@ -64,9 +67,17 @@ export default defineDashboardExtension({
   login: { logo: { component: LoginLogo } },
   customProviders: [{ id: "spora-branding", component: SporaBranding }],
   navSections: sporaNav,
+  // Marca y categoría global del producto (custom fields con ui.component, en catalog.plugin.ts).
+  customFormComponents: {
+    customFields: [
+      { id: "spora-marca", component: BrandSelect },
+      { id: "spora-categoria-global", component: CategorySelect },
+    ],
+  },
   routes: [
     { path: "/mi-tienda", loader: () => ({ breadcrumb: "Mi tienda" }), component: () => <StoreSettingsPage /> },
     { path: "/comisiones", loader: () => ({ breadcrumb: "Comisiones" }), component: () => <CommissionsPage /> },
+    { path: "/marcas", loader: () => ({ breadcrumb: "Marcas" }), component: () => <BrandsPage /> },
     { path: "/disputas", loader: () => ({ breadcrumb: "Disputas" }), component: () => <DisputesPage /> },
     { path: "/acuerdos", loader: () => ({ breadcrumb: "Acuerdos de comisión" }), component: () => <AgreementsPage /> },
   ],

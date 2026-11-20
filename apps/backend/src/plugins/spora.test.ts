@@ -411,6 +411,45 @@ describe("catálogo", () => {
       /fusionó/,
     );
   });
+
+  test("rechazar una marca: sus productos quedan sin marca y ya no se puede usar; el comercio no puede rechazar", async () => {
+    const REJECT = gql`
+      mutation ($id: ID!) {
+        rejectBrand(id: $id) {
+          slug
+          status
+        }
+      }
+    `;
+    const brand = (await adminClient.query(PROPOSE, { name: "Marca Dudosa" })).proposeBrand;
+    const product = (
+      await adminClient.query(CREATE_PRODUCT, {
+        enabled: true,
+        slug: "dudoso",
+        category: "moda",
+        brand: "marca-dudosa",
+      })
+    ).createProduct;
+
+    await adminClient.asUserWithCredentials(admin.emailAddress, admin.password);
+    adminClient.setChannelToken("cafe-sur");
+    try {
+      await assert.rejects(adminClient.query(REJECT, { id: brand.id }), /not currently authorized/);
+    } finally {
+      adminClient.setChannelToken(testConfig.defaultChannelToken ?? "e2e-default-channel");
+      await adminClient.asSuperAdmin();
+    }
+
+    assert.deepEqual((await adminClient.query(REJECT, { id: brand.id })).rejectBrand, {
+      slug: "marca-dudosa",
+      status: "rechazada",
+    });
+    assert.equal((await adminClient.query(PRODUCT, { id: product.id })).product.customFields.brand, null);
+    await assert.rejects(
+      adminClient.query(CREATE_PRODUCT, { enabled: false, slug: "dudoso-2", category: "moda", brand: "marca-dudosa" }),
+      /rechazada/,
+    );
+  });
 });
 
 describe("cuenta y checkout (M3)", () => {
