@@ -4,10 +4,10 @@ Etapas del MVP en [MVP.md](MVP.md); decisiones tomadas en el camino en [DECISION
 
 ## Antes de producción
 Cosas que funcionan en local pero hay que resolver antes de poner Spora en línea.
-- **Peso del JS del cliente:** 171 KB minificado / **58 KB gzip** por página. ~120 KB son del núcleo de SibuJS (su
-  `dist` agrupa muchos módulos por chunk y el tree-shaking rinde poco) y 27 KB de `tailwind-merge`, que arrastra
-  sibujs-ui. Opciones: preguntar upstream, o no usar sibujs-ui dentro de las islas. El marketplace, que solo mejora
-  los filtros, igual carga 114 KB.
+- **Peso del JS del cliente:** **145 KB minificado / 47 KB gzip** por página en las tiendas y 34 KB / 12 KB gzip en
+  el marketplace (medido el 2026-11-20 con SibuJS 4.15.3, que arregló su tree-shaking; antes 171 KB / 58 KB y 114 KB).
+  Lo que más pesa de lo que queda: 27 KB de `tailwind-merge`, que arrastra sibujs-ui. Opción: no usar sibujs-ui
+  dentro de las islas.
 - **Meilisearch:** el marketplace usa la llave maestra en local; en línea, una llave de solo búsqueda
   (`MEILI_SEARCH_KEY`) y otra con escritura solo para el backend.
 - **CSS completo de sibujs-ui (116 KB, incluye Preflight):** se carga entero porque no compilamos Tailwind. Compilar
@@ -15,10 +15,6 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
 - **Sombras fijas de sibujs-ui:** sus componentes traen sombras de Tailwind con valores fijos (no son variables), así
   que los estilos de `@spora/themes` no las controlan. Hoy se tapan con clases propias; al compilar Tailwind, mapear
   `--shadow-*` a las variables `--sp-shadow*`.
-- **Bug de SSR de SibuJS** (`checked`, `selected` y `value` reactivo no salen en el HTML del servidor; confirmado con un
-  test canario en M3): con un
-  workaround en los componentes. Reporte para upstream en
-  [reportes/sibujs-checked-ssr.md](reportes/sibujs-checked-ssr.md).
 - **Verificar el correo al registrarse:** activar `requireVerification` cuando haya correos transaccionales (hoy está
   apagado: cualquiera puede crear una cuenta con un correo ajeno). Ojo: al verificar, Vendure asigna al cliente al
   canal donde verificó; quitarlo como al registrarse.

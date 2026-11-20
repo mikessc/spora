@@ -16,8 +16,8 @@
     "@spora/api-client": "workspace:*",
     "@spora/themes": "workspace:*",
     "hono": "^4.9.0",
-    "sibujs": "4.15.2",
-    "sibujs-ui": "1.10.0",
+    "sibujs": "4.15.3",
+    "sibujs-ui": "1.10.1",
     "@spora/ui": "workspace:*",
     "@spora/shared": "workspace:*",
     "@spora/web": "workspace:*"

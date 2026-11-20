@@ -1,7 +1,6 @@
 // Campos de una dirección de Costa Rica con el nomenclátor compartido con TrackingApp. Solo servidor.
 import { type Address, crCantons, crDistricts, crProvinces } from "@spora/shared";
 import { div, input, label, optgroup, option, p, select, textarea } from "sibujs";
-import { markIf } from "./ssr-form";
 
 /**
  * Un solo `<select>` de distritos agrupados por "Provincia › Cantón": funciona sin JS y se puede buscar tecleando.
@@ -9,16 +8,13 @@ import { markIf } from "./ssr-form";
  */
 function DistrictSelect(selectedCode: string | undefined, required: boolean) {
   return select({ id: "distrito", name: "distrito", required, autocomplete: "off", class: "address__select" }, [
-    option({ value: "", onElement: markIf(!selectedCode, "selected") }, "Elija el distrito"),
+    option({ value: "", selected: !selectedCode }, "Elija el distrito"),
     ...crProvinces().flatMap((province) =>
       crCantons(province.code).map((canton) =>
         optgroup(
           { label: `${province.name} › ${canton.name}` },
           crDistricts(canton.code).map((district) =>
-            option(
-              { value: district.code, onElement: markIf(district.code === selectedCode, "selected") },
-              district.name,
-            ),
+            option({ value: district.code, selected: district.code === selectedCode }, district.name),
           ),
         ),
       ),

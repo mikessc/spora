@@ -3,6 +3,5 @@ export * from "./add-to-cart";
 export * from "./address";
 export * from "./catalog";
 export * from "./gallery";
-export * from "./ssr-form";
 export * from "./variant-event";
 export * from "./variant-selector";

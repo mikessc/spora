@@ -1,6 +1,5 @@
 // Listados: tarjetas de producto y filtros. Solo servidor (HTML estático); los filtros se mejoran con una isla.
 import { type CatalogProduct, type Facet, formatMoney } from "@spora/shared";
-import { markIf } from "./ssr-form";
 import { a, article, button, div, fieldset, form, h3, img, input, label, legend, li, p, span, ul } from "sibujs";
 
 export function ProductCard(product: CatalogProduct) {
@@ -48,7 +47,6 @@ export interface FilterPanelProps {
 
 /**
  * Formulario GET: funciona sin JS (botón "Aplicar"). Con JS, la isla `filters` lo envía al cambiar una casilla.
- * `checked` va como atributo con `markIf`: SibuJS no lo serializa en el SSR.
  */
 export function FilterPanel({ groups, action, hidden = {}, extra = [] }: FilterPanelProps) {
   const kept = Object.entries(hidden).filter(([, value]) => value);
@@ -64,7 +62,7 @@ export function FilterPanel({ groups, action, hidden = {}, extra = [] }: FilterP
               type: "checkbox",
               name: group.name,
               value: value.value,
-              onElement: markIf(value.selected, "checked"),
+              checked: value.selected,
             }),
             span("filters__label", value.label),
             span("filters__count", `(${value.count})`),

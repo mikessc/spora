@@ -13,6 +13,6 @@
     "@spora/api-client": "workspace:*",
     "@spora/shared": "workspace:*",
     "hono": "^4.9.0",
-    "sibujs": "4.15.2"
+    "sibujs": "4.15.3"
   }
 }

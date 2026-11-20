@@ -1,5 +1,10 @@
 # Reporte para hexplus/sibujs: el SSR pierde el estado de los controles de formulario
 
+> **Resuelto en sibujs 4.15.3** (2026-11-19, [PR #103](https://github.com/hexplus/sibujs/pull/103) "Fix/ssr form
+> control state"): el HTML del servidor ya trae `checked`, `selected` y `value`, fijos o reactivos. Spora pasó a
+> 4.15.3 el 2026-11-20, quitó su workaround (`markIf`) y dejó un test de regresión en
+> `packages/ui/src/ssr-estado-formularios.test.ts` que falla si el bug vuelve. Lo que sigue es el reporte original.
+
 Para abrir como issue en <https://github.com/hexplus/sibujs> (o pasárselo directo al mantenedor). Encontrado en la
 Fase 0 de Spora (ver [ADR 0002](../adr/0002-sibujs-ssr-islas.md)). En inglés, el idioma del repo.
 

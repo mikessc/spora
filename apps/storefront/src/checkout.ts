@@ -14,7 +14,7 @@ import {
   type PaymentOption,
   type ShippingOption,
 } from "@spora/shared";
-import { AddressFields, markIf } from "@spora/ui";
+import { AddressFields } from "@spora/ui";
 import type { Hono } from "hono";
 import { a, button, div, fieldset, form, h1, h2, input, label, legend, li, main, ol, p, section, span } from "sibujs";
 import { type Ctx, type Env, field, type Render } from "@spora/web";
@@ -87,7 +87,7 @@ function ContactPage({ cart, customer, error }: { cart: Cart; customer: Customer
                     type: "radio",
                     name: "direccion",
                     value: addr.id ?? "",
-                    onElement: markIf(i === 0, "checked"),
+                    checked: i === 0,
                   }),
                   span(`${addr.fullName}: ${addr.street}, ${addr.district}, ${addr.canton}`),
                 ]),
@@ -101,7 +101,7 @@ function ContactPage({ cart, customer, error }: { cart: Cart; customer: Customer
         AddressFields({ ...(cart.shippingAddress ?? {}) }, saved.length === 0),
         customer
           ? label("checkout__choice", [
-              input({ type: "checkbox", name: "guardar", value: "1", onElement: markIf(true, "checked") }),
+              input({ type: "checkbox", name: "guardar", value: "1", checked: true }),
               span("Guardar esta dirección en mi cuenta"),
             ])
           : null,
@@ -134,7 +134,7 @@ function ShippingPage({ cart, options, error }: { cart: Cart; options: ShippingO
               name: "envio",
               value: o.id,
               required: true,
-              onElement: markIf(o.id === current, "checked"),
+              checked: o.id === current,
             }),
             span("checkout__choice-name", o.name),
             span("checkout__choice-price", o.price.amount ? formatMoney(o.price) : "Gratis"),
@@ -175,7 +175,7 @@ function PaymentPage({
               name: "pago",
               value: o.code,
               required: true,
-              onElement: markIf(i === 0, "checked"),
+              checked: i === 0,
             }),
             span("checkout__choice-name", o.name),
             o.description ? span("checkout__choice-note", o.description) : null,

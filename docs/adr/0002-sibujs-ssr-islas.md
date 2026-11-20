@@ -1,6 +1,7 @@
 # 0002 — Front: SibuJS con SSR + islas, servido por Hono
 
-- Estado: aceptada (2026-11-13); **Fase 0 superada** (2026-11-19, SibuJS 4.15.2, sibujs-ui 1.10.0)
+- Estado: aceptada (2026-11-13); **Fase 0 superada** (2026-11-19, SibuJS 4.15.2, sibujs-ui 1.10.0). Al día con
+  SibuJS 4.15.3 y sibujs-ui 1.10.1 (2026-11-20): bug de SSR resuelto upstream y cliente más liviano (ver abajo).
 
 ## Contexto
 Se evaluó Next.js. Mike prefiere SibuJS (MIT, v4.x): reactividad fina por señales, sin Virtual DOM ni compilador, con
@@ -18,8 +19,9 @@ carrito, filtros, buscador, selector de variantes y checkout se hidratan.
   cambia solo la capa visual (Astro o Next.js).
 
 ## Resultado de la Fase 0 (2026-11-19)
-Ficha de producto en `apps/storefront` leyendo de Vendure local; verificado en Chrome con
-`pnpm --filter @spora/storefront check` (`apps/storefront/scripts/check-fase0.mjs`).
+Ficha de producto en `apps/storefront` leyendo de Vendure local; verificado en Chrome. Esos chequeos son hoy los
+primeros recorridos de `pnpm e2e` (`apps/storefront/scripts/e2e.mjs`): ficha sin JS, hidratación sin cambios
+visibles y captura idéntica con y sin JS.
 
 | Criterio | Resultado |
 |---|---|
@@ -38,16 +40,15 @@ Ficha de producto en `apps/storefront` leyendo de Vendure local; verificado en C
   la cookie de sesión.
 
 ### Lo que hay que saber (hallazgos)
-- **`checked` reactivo no se serializa en SSR.** SibuJS lo escribe como propiedad IDL (igual que un navegador) y el
-  HTML sale sin la opción marcada; al hidratar el chip cambiaba de color. Un `checked: true` estático tampoco sale
-  (solo un string escribe el atributo). Solución en el componente: `onElement` agrega el atributo cuando `isSSR()`.
-  Probablemente aplica igual a `value` y `selected`: revisarlo en cada formulario del checkout. Vale la pena
-  reportarlo al repo de SibuJS.
+- **`checked` reactivo no se serializaba en SSR** (tampoco `selected` ni `value` reactivo), y al hidratar el chip
+  cambiaba de color. Se reportó ([reportes/sibujs-checked-ssr.md](../reportes/sibujs-checked-ssr.md)) y **se
+  corrigió en SibuJS 4.15.3**. El workaround (`markIf`, que ponía el atributo en `onElement`) se quitó; los
+  componentes usan `checked`/`selected` normales y un test de regresión vigila que el bug no vuelva.
 - **Props como JSON en `data-sibu-props`**: el HTML lleva una copia de los datos de cada isla (~3 KB con 6
   variantes). Vigilar con productos de muchas variantes.
-- **Peso del cliente:** 171 KB minificado / 58 KB gzip. ~120 KB son del núcleo de SibuJS (su `dist` agrupa muchos
-  módulos por chunk y el tree-shaking rinde poco) y 27 KB de `tailwind-merge`, que arrastra sibujs-ui. Aceptable
-  para la Fase 0; revisar antes de producción (preguntar upstream, o no usar sibujs-ui dentro de las islas).
+- **Peso del cliente:** en la Fase 0, 171 KB minificado / 58 KB gzip, porque el tree-shaking de SibuJS rendía poco.
+  SibuJS 4.15.3 lo arregló (PR #100): **145 KB / 47 KB gzip** en las tiendas y **34 KB / 12 KB gzip** en el
+  marketplace (antes 114 KB). Sigue pesando `tailwind-merge` (27 KB), que arrastra sibujs-ui.
 - **sibujs-ui** funciona en SSR + adopt (botón de "agregar al carrito"). Sin compilar Tailwind hay que cargar su CSS
   precompilado (116 KB, incluye Preflight). Colores y `--radius` son variables, puenteadas a `--sp-*` en
   `@spora/themes/base.css`; las **sombras son valores fijos de Tailwind**, así que la forma de las sombras la

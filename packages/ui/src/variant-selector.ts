@@ -7,8 +7,7 @@ import {
   type StockLevel,
   type Variant,
 } from "@spora/shared";
-import { derived, div, fieldset, input, isSSR, label, legend, p, signal, span } from "sibujs";
-import { markIf } from "./ssr-form";
+import { derived, div, fieldset, input, label, legend, p, signal, span } from "sibujs";
 import { emitVariant } from "./variant-event";
 
 export interface VariantSelectorProps {
@@ -87,8 +86,6 @@ export function VariantSelector({ optionGroups, variants, initialVariantId, exch
                   name: `opcion-${group.id}`,
                   value: option.id,
                   checked: () => selected()[group.id] === option.id,
-                  // El SSR no serializa `checked` (ver ssr-form.ts): en el servidor va también como atributo.
-                  onElement: markIf(isSSR() && selected()[group.id] === option.id, "checked"),
                   on: { change: () => choose(group.id, option.id) },
                 }),
                 span("variants__label", option.name),
