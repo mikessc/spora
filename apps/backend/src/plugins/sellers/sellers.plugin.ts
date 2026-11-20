@@ -1,5 +1,5 @@
 import { Inject, Injectable, type MiddlewareConsumer, type NestMiddleware, type NestModule } from "@nestjs/common";
-import { Args, Mutation, Resolver } from "@nestjs/graphql";
+import { Args, Mutation, Query, Resolver } from "@nestjs/graphql";
 import {
   Allow,
   Asset,
@@ -12,13 +12,15 @@ import {
   Transaction,
   VendurePlugin,
 } from "@vendure/core";
-import { designStyles, fonts } from "@spora/themes";
+import { designStyles, fonts, paletteLabels, paletteRoles } from "@spora/themes";
 import type { NextFunction, Request, Response } from "express";
+import { DEFAULT_CHANNEL_CODE } from "@vendure/common/lib/shared-constants";
 import gql from "graphql-tag";
 import {
   type CreateStoreInput,
   type SellerStatus,
   sellerStatuses,
+  paletteField,
   type StoreSettingsInput,
   StoreService,
   updateStoreSettingsPermission,
@@ -31,7 +33,11 @@ declare module "@vendure/core/dist/entity/custom-entity-fields" {
   interface CustomChannelFields {
     storeName: string | null;
     designStyle: string;
-    primaryColor: string | null;
+    palettePrimary: string | null;
+    paletteSecondary: string | null;
+    paletteAccent: string | null;
+    paletteBackground: string | null;
+    paletteText: string | null;
     font: string;
     logo: Asset | null;
     tagline: string | null;
@@ -87,7 +93,12 @@ const adminApi = gql`
   input StoreSettingsInput {
     storeName: String
     designStyle: String
-    primaryColor: String
+    "Paleta de 5 colores (hexadecimal). Sin paleta completa, la tienda usa la de Spora."
+    palettePrimary: String
+    paletteSecondary: String
+    paletteAccent: String
+    paletteBackground: String
+    paletteText: String
     font: String
     logoId: ID
     tagline: String
@@ -99,6 +110,10 @@ const adminApi = gql`
     privacyPolicy: String
     trackingAppKey: String
     trackingAppWebhookSecret: String
+  }
+  extend type Query {
+    "URL pública de la tienda activa (para la vista previa de Mi tienda). null en el canal del marketplace."
+    storeUrl: String
   }
   extend type Mutation {
     "Alta de comercio: crea comercio (pendiente), canal, ubicación de stock, rol limitado y usuario administrador."
@@ -117,6 +132,16 @@ class StoreAdminResolver {
   @Allow(Permission.SuperAdmin)
   registerStore(@Ctx() ctx: RequestContext, @Args("input") input: CreateStoreInput) {
     return this.stores.createStore(ctx, input);
+  }
+
+  @Query()
+  @Allow(Permission.ReadChannel)
+  storeUrl(@Ctx() ctx: RequestContext) {
+    if (ctx.channel.code === DEFAULT_CHANNEL_CODE) return null;
+    return (process.env.STOREFRONT_URL ?? "http://{tienda}.spora.localhost:4000").replace(
+      "{tienda}",
+      ctx.channel.token,
+    );
   }
 
   @Mutation()
@@ -158,15 +183,16 @@ class StoreAdminResolver {
         options: designStyles.map((value) => ({ value, label: es(value) })),
         ui: tab,
       },
-      {
-        name: "primaryColor",
-        type: "string",
+      // Paleta de 5 roles (@spora/themes). El comercio la elige en "Mi tienda", con vista previa y avisos de contraste.
+      ...paletteRoles.map((role) => ({
+        name: paletteField(role),
+        type: "string" as const,
         nullable: true,
         pattern: "^#[0-9a-fA-F]{6}$",
-        label: es("Color de marca"),
-        description: es("Hexadecimal, p. ej. #1d6b4f. Vacío: la paleta por defecto."),
+        label: es(`Paleta: ${paletteLabels[role].name.toLowerCase()}`),
+        description: es(`${paletteLabels[role].use[0]!.toUpperCase()}${paletteLabels[role].use.slice(1)}.`),
         ui: tab,
-      },
+      })),
       {
         name: "font",
         type: "string",

@@ -1,7 +1,7 @@
 // El documento HTML alrededor de cada página: estilos de la tienda, SEO y el script de las islas.
 import type { Store } from "@spora/api-client";
 import type { PageMeta } from "@spora/web";
-import { type DesignStyle, isDesignStyle, themeCss } from "@spora/themes";
+import { type DesignStyle, fonts, isDesignStyle, isPalette, paletteRoles, themeCss } from "@spora/themes";
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 /** JSON dentro de `<script>`: sin `<` no hay forma de cerrar la etiqueta ni abrir un comentario. */
@@ -13,9 +13,23 @@ export function styleFor(store: Store, requested?: string): DesignStyle {
   return isDesignStyle(store.designStyle) ? store.designStyle : "suave";
 }
 
+/**
+ * Vista previa de "Mi tienda" en el Panel Spora: `?paleta=` (5 colores sin #, separados por guiones, en el orden de
+ * los roles) y `?fuente=` cambian solo esta respuesta. Lo inválido se ignora (themeCss valida igual).
+ */
+export function previewStore(store: Store, query: { paleta?: string; fuente?: string }): Store {
+  const colors = query.paleta?.split("-").map((c) => `#${c}`);
+  const palette = colors && Object.fromEntries(paletteRoles.map((role, i) => [role, colors[i]]));
+  return {
+    ...store,
+    palette: isPalette(palette) ? palette : store.palette,
+    font: query.fuente && query.fuente in fonts ? query.fuente : store.font,
+  };
+}
+
 export function documentHtml(store: Store, style: DesignStyle, meta: PageMeta, body: string) {
   const description = meta.description?.slice(0, 160);
-  const css = themeCss({ primaryColor: store.primaryColor, font: store.font });
+  const css = themeCss({ palette: store.palette, font: store.font });
   return `<!doctype html>
 <html lang="es-CR">
   <head>

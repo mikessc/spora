@@ -32,7 +32,7 @@ const SPORA: Store = {
   name: "Spora",
   currency: "CRC",
   designStyle: "suave",
-  primaryColor: null,
+  palette: null,
   font: "sistema",
   logo: null,
   tagline: "Tiendas de Costa Rica",

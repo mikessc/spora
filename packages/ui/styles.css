@@ -99,6 +99,7 @@ body {
 }
 .variants__price {
   margin: 0;
+  color: var(--sp-price);
   font-size: var(--sp-text-lg);
   font-weight: var(--sp-heading-weight);
 }

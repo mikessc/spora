@@ -1,18 +1,32 @@
 /*
- * Paleta y tipografía por defecto + puente a los tokens de sibujs-ui.
+ * Paleta (5 roles) y tipografía por defecto + puente a los tokens de sibujs-ui.
  * Los componentes solo leen variables --sp-*; los estilos (estilos/*.css) definen la forma.
  */
 :root {
-  /* Paleta */
+  /* Paleta de Spora por defecto: los 5 roles y sus tonos (paletteVariables(defaultPalette); un test lo verifica).
+     Cada tienda la reemplaza con themeCss(). */
   --sp-color-bg: #faf8f5;
-  --sp-color-surface: #ffffff;
+  --sp-color-surface: #fefdfc;
   --sp-color-fg: #1f1d1a;
-  --sp-color-muted: #6b665e;
-  --sp-color-border: #e4dfd7;
+  --sp-color-muted: #73716e;
+  --sp-color-border: #dbd9d6;
   --sp-color-primary: #1d6b4f;
-  --sp-color-primary-fg: #ffffff;
+  --sp-color-primary-fg: #faf8f5;
+  --sp-color-primary-hover: #3d8068;
+  --sp-color-primary-soft: #dfe7e1;
+  --sp-color-primary-text: #1d6b4f;
+  --sp-color-secondary: #173a2e;
+  --sp-color-secondary-fg: #faf8f5;
+  --sp-color-secondary-hover: #37564b;
+  --sp-color-secondary-soft: #dfe1dd;
+  --sp-color-secondary-text: #173a2e;
+  --sp-color-accent: #d9a21b;
+  --sp-color-accent-fg: #1f1d1a;
+  --sp-color-accent-hover: #bb8b17;
+  --sp-color-accent-soft: #f6eedb;
+  --sp-color-accent-text: #8f6d1b;
   --sp-color-danger: #b42318;
-  --sp-color-ok: #1d6b4f;
+  --sp-color-ok: var(--sp-color-primary-text);
 
   /* Tipografía */
   --sp-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

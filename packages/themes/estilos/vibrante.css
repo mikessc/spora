@@ -1,4 +1,4 @@
-/* Vibrante: degradados del color de marca, brillo y esquinas generosas. */
+/* Vibrante: degradados, brillo y esquinas generosas. Botones con degradado del primario, encabezado y pie en el secundario, franja del primario al acento. */
 :root {
   --sp-radius: 1rem;
   --sp-radius-sm: 0.6rem;
@@ -13,17 +13,19 @@
   --sp-heading-weight: 800;
   --sp-heading-transform: none;
   --sp-heading-tracking: -0.02em;
-  --sp-button-fg: var(--sp-color-primary-fg);
-  --sp-button-bg: linear-gradient(
-    135deg,
-    var(--sp-color-primary),
-    color-mix(in oklch, var(--sp-color-primary) 55%, white)
-  );
-  --sp-hero-bg: linear-gradient(
-    135deg,
-    color-mix(in oklch, var(--sp-color-primary) 30%, var(--sp-color-bg)),
-    color-mix(in oklch, var(--sp-color-primary) 8%, var(--sp-color-bg))
-  );
   --sp-grid-min: 14rem;
   --sp-image-ratio: 1;
+  --sp-button-bg: linear-gradient(135deg, var(--sp-color-primary), var(--sp-color-primary-hover));
+  --sp-button-fg: var(--sp-color-primary-fg);
+  --sp-header-bg: var(--sp-color-secondary);
+  --sp-header-fg: var(--sp-color-secondary-fg);
+  --sp-header-border: var(--sp-color-secondary);
+  --sp-footer-bg: var(--sp-color-secondary);
+  --sp-footer-fg: var(--sp-color-secondary-fg);
+  --sp-hero-bg: linear-gradient(135deg, var(--sp-color-primary-soft), var(--sp-color-accent-soft));
+  --sp-hero-fg: var(--sp-color-fg);
+  --sp-badge-bg: var(--sp-color-accent);
+  --sp-badge-fg: var(--sp-color-accent-fg);
+  --sp-link: var(--sp-color-primary-text);
+  --sp-price: var(--sp-color-primary-text);
 }

@@ -27,7 +27,7 @@ import {
   UserService,
 } from "@vendure/core";
 import { businessDate, type CurrencyCode as SporaCurrency } from "@spora/shared";
-import { type DesignStyle, fonts, isDesignStyle } from "@spora/themes";
+import { type DesignStyle, fonts, isDesignStyle, isHexColor, type PaletteRole, paletteRoles } from "@spora/themes";
 import { Like } from "typeorm";
 import { CommissionAgreement } from "../commissions/commissions.service";
 import { cashOnDeliveryHandler } from "../payments/handlers";
@@ -83,11 +83,19 @@ export const SELLER_PERMISSIONS: Permission[] = [
   updateStoreSettingsPermission.Permission,
 ];
 
+/** Campo del canal de cada rol de la paleta: primary → palettePrimary. */
+export const paletteField = (role: PaletteRole) =>
+  `palette${role[0]!.toUpperCase()}${role.slice(1)}` as `palette${Capitalize<PaletteRole>}`;
+
 /** Lo único del canal que el comercio puede cambiar. `undefined` = no se toca; `null` = se borra. */
 export interface StoreSettingsInput {
   storeName?: string | null;
   designStyle?: string | null;
-  primaryColor?: string | null;
+  palettePrimary?: string | null;
+  paletteSecondary?: string | null;
+  paletteAccent?: string | null;
+  paletteBackground?: string | null;
+  paletteText?: string | null;
   font?: string | null;
   logoId?: ID | null;
   tagline?: string | null;
@@ -157,9 +165,13 @@ export class StoreService implements OnApplicationBootstrap {
     if (fields.font != null && !(fields.font in fonts)) {
       throw new UserInputError(`Tipografía desconocida: ${fields.font}`);
     }
-    if (fields.primaryColor === "") fields.primaryColor = null;
-    if (fields.primaryColor != null && !/^#[0-9a-fA-F]{6}$/.test(fields.primaryColor)) {
-      throw new UserInputError("primaryColor: use un color hexadecimal como #1d6b4f");
+    for (const role of paletteRoles) {
+      const name = paletteField(role);
+      if (fields[name] === "") fields[name] = null;
+      const value = fields[name];
+      if (value != null && !isHexColor(value)) {
+        throw new UserInputError(`${name}: use un color hexadecimal como #1d6b4f`);
+      }
     }
     if (logoId != null && !(await this.assets.findOne(ctx, logoId))) {
       throw new UserInputError("Logo: imagen no encontrada en la tienda");

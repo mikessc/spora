@@ -33,10 +33,10 @@ import {
   isCommonAttribute,
   slugify,
 } from "@spora/shared";
-import type { DesignStyle } from "@spora/themes";
+import { type DesignStyle, paletteRoles, suggestedPalettes } from "@spora/themes";
 import { MarketplaceCategory } from "./plugins/catalog/entities";
 import { CatalogService } from "./plugins/catalog/catalog.service";
-import { flatRate, StoreService } from "./plugins/sellers/store.service";
+import { flatRate, paletteField, StoreService } from "./plugins/sellers/store.service";
 import { type ShipmentEventKind, ShipmentEventsService } from "./plugins/shipping/shipping.plugin";
 import { config } from "./vendure-config";
 
@@ -63,6 +63,12 @@ const categories: Tree = [
 const brands = ["Sibú", "Café Sur", "Barro y Telar", "Voltio"];
 /** Una marca propuesta por una tienda y todavía sin aprobar: no aparece en el marketplace hasta que Spora la apruebe. */
 const proposedBrand = "Artesanías del Sur";
+
+/** Los campos del canal de una de las paletas sugeridas (@spora/themes): cada tienda de ejemplo, la de su rubro. */
+const palette = (name: string) => {
+  const chosen = suggestedPalettes.find((p) => p.name === name)!.palette;
+  return Object.fromEntries(paletteRoles.map((role) => [paletteField(role), chosen[role]]));
+};
 
 interface StoreSeed {
   slug: string;
@@ -118,7 +124,7 @@ const stores: StoreSeed[] = [
     style: "suave",
     admin: { email: "demo@spora.localhost", password: "demo1234", firstName: "Comercio", lastName: "Demo" },
     theme: {
-      primaryColor: "#1d6b4f",
+      ...palette("Algodón y bosque"),
       tagline: "Ropa de algodón hecha en Costa Rica",
       about: "Somos un taller familiar en San José. Cortamos y cosemos cada pieza en pequeños lotes.",
       contactEmail: "hola@tienda-demo.cr",
@@ -163,7 +169,7 @@ const stores: StoreSeed[] = [
     style: "editorial",
     admin: { email: "cafe@spora.localhost", password: "cafe1234", firstName: "Lucía", lastName: "Solano" },
     theme: {
-      primaryColor: "#6b4226",
+      ...palette("Café de altura"),
       font: "clasica",
       tagline: "Café de altura, tostado cada semana",
       about: "Compramos directo a fincas de Tarrazú y Los Santos.",
@@ -199,7 +205,7 @@ const stores: StoreSeed[] = [
     style: "pop",
     admin: { email: "barro@spora.localhost", password: "barro1234", firstName: "Rocío", lastName: "Chaves" },
     theme: {
-      primaryColor: "#b5562f",
+      ...palette("Barro y añil"),
       font: "redondeada",
       tagline: "Artesanía costarricense hecha a mano",
       about: "Trabajamos con artesanas de Guaitil y del territorio boruca. Cada pieza es única.",
@@ -231,7 +237,7 @@ const stores: StoreSeed[] = [
     style: "minimal",
     admin: { email: "voltio@spora.localhost", password: "voltio1234", firstName: "Diego", lastName: "Arias" },
     theme: {
-      primaryColor: "#2c2c2c",
+      ...palette("Circuito"),
       font: "geometrica",
       tagline: "Accesorios de tecnología con garantía",
       about: "Audio y accesorios para celular. Garantía de 6 meses en todo.",

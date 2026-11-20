@@ -1,4 +1,4 @@
-/* Suave: muy redondeado, sombras difusas, sin bordes duros, espacios amplios. */
+/* Suave: muy redondeado, sombras difusas, sin bordes duros, espacios amplios. Encabezado en el tono suave del secundario, pie en el secundario, franja en el suave del primario. */
 :root {
   --sp-radius: 1.25rem;
   --sp-radius-sm: 0.75rem;
@@ -13,9 +13,19 @@
   --sp-heading-weight: 650;
   --sp-heading-transform: none;
   --sp-heading-tracking: -0.01em;
-  --sp-button-fg: var(--sp-color-primary-fg);
-  --sp-button-bg: var(--sp-color-primary);
-  --sp-hero-bg: color-mix(in oklab, var(--sp-color-primary) 10%, var(--sp-color-bg));
   --sp-grid-min: 14rem;
   --sp-image-ratio: 1;
+  --sp-button-bg: var(--sp-color-primary);
+  --sp-button-fg: var(--sp-color-primary-fg);
+  --sp-header-bg: var(--sp-color-secondary-soft);
+  --sp-header-fg: var(--sp-color-fg);
+  --sp-header-border: var(--sp-color-secondary-soft);
+  --sp-footer-bg: var(--sp-color-secondary);
+  --sp-footer-fg: var(--sp-color-secondary-fg);
+  --sp-hero-bg: var(--sp-color-primary-soft);
+  --sp-hero-fg: var(--sp-color-fg);
+  --sp-badge-bg: var(--sp-color-accent);
+  --sp-badge-fg: var(--sp-color-accent-fg);
+  --sp-link: var(--sp-color-primary-text);
+  --sp-price: var(--sp-color-primary-text);
 }

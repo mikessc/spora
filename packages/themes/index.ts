@@ -1,5 +1,8 @@
-// Tres capas independientes (ADR 0005): estilo (forma) × paleta (color de marca) × tipografía.
+// Tres capas independientes (ADR 0005): estilo (forma) × paleta (5 roles de color) × tipografía.
 // Agregar un estilo = un archivo en estilos/ y su nombre aquí.
+import { defaultPalette, isPalette, type Palette, paletteVariables } from "./palette";
+
+export * from "./palette";
 
 export const designStyles = ["suave", "minimal", "vibrante", "editorial", "pop"] as const;
 export type DesignStyle = (typeof designStyles)[number];
@@ -16,28 +19,14 @@ export const fonts = {
 } as const;
 export type Font = keyof typeof fonts;
 
-const HEX = /^#[0-9a-f]{6}$/i;
-
-/** Texto legible sobre `hex`: blanco u oscuro según la luminancia (WCAG). */
-export function contrastText(hex: string): "#ffffff" | "#1f1d1a" {
-  const [r, g, b] = [1, 3, 5].map((i) => {
-    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  }) as [number, number, number];
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  // Contraste contra blanco vs. contra #1f1d1a (luminancia ≈ 0.013): gana el mayor.
-  return 1.05 / (luminance + 0.05) >= (luminance + 0.05) / 0.063 ? "#ffffff" : "#1f1d1a";
-}
-
 /**
- * Variables de la paleta y la tipografía de una tienda, listas para un `<style>`. Ignora valores inválidos (vienen de
- * la base de datos, no se confía en ellos dentro de CSS).
+ * Variables de la paleta y la tipografía de una tienda, listas para un `<style>`. Una paleta inválida (viene de la
+ * base de datos o de un parámetro de vista previa: no se confía en ella dentro de CSS) usa la de Spora.
  */
-export function themeCss({ primaryColor, font }: { primaryColor?: string | null; font?: string | null }): string {
-  const vars: string[] = [];
-  if (primaryColor && HEX.test(primaryColor)) {
-    vars.push(`--sp-color-primary: ${primaryColor}`, `--sp-color-primary-fg: ${contrastText(primaryColor)}`);
-  }
+export function themeCss({ palette, font }: { palette?: Partial<Palette> | null; font?: string | null }): string {
+  const vars = Object.entries(paletteVariables(isPalette(palette) ? palette : defaultPalette)).map(
+    ([name, value]) => `${name}: ${value}`,
+  );
   if (font && font in fonts) vars.push(`--sp-font: ${fonts[font as Font]}`);
-  return vars.length ? `:root { ${vars.join("; ")}; }` : "";
+  return `:root { ${vars.join("; ")}; }`;
 }

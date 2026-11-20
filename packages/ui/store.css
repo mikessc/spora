@@ -11,6 +11,10 @@
 a {
   color: inherit;
 }
+/* Enlaces sueltos del contenido (políticas, carrito, pedido): en el tono del primario que se lee sobre el fondo. */
+.store main a:not([class]) {
+  color: var(--sp-link);
+}
 .store {
   display: flex;
   flex-direction: column;
@@ -29,8 +33,9 @@ a {
   align-items: center;
   gap: var(--sp-space);
   padding: var(--sp-space) calc(var(--sp-space) * 1.5);
-  background: var(--sp-color-surface);
-  border-bottom: max(var(--sp-border-width), 1px) solid var(--sp-border-color);
+  color: var(--sp-header-fg);
+  background: var(--sp-header-bg);
+  border-bottom: max(var(--sp-border-width), 1px) solid var(--sp-header-border);
 }
 .store-header__brand {
   display: flex;
@@ -114,7 +119,8 @@ a {
   gap: 0.5rem;
   padding: calc(var(--sp-space) * 1.5);
   font-size: var(--sp-text-sm);
-  color: var(--sp-color-muted);
+  color: var(--sp-footer-fg);
+  background: var(--sp-footer-bg);
   border-top: max(var(--sp-border-width), 1px) solid var(--sp-border-color);
 }
 .store-footer p {
@@ -127,6 +133,7 @@ a {
   gap: 0.5rem;
   margin-bottom: calc(var(--sp-space) * 1.5);
   padding: calc(var(--sp-space) * 2);
+  color: var(--sp-hero-fg);
   background: var(--sp-hero-bg);
   border: var(--sp-border-width) solid var(--sp-border-color);
   border-radius: var(--sp-radius);
@@ -144,7 +151,6 @@ a {
   margin: 0;
   max-width: 42rem;
   line-height: 1.6;
-  color: var(--sp-color-muted);
 }
 
 /* Listados (portada, categoría, búsqueda), carrito y políticas */
@@ -222,8 +228,8 @@ a {
   left: 0.6rem;
   padding: 0.15rem 0.5rem;
   font-size: var(--sp-text-sm);
-  color: var(--sp-color-bg);
-  background: var(--sp-color-fg);
+  color: var(--sp-badge-fg);
+  background: var(--sp-badge-bg);
   border-radius: var(--sp-radius-pill);
 }
 .product-card__name {
@@ -234,7 +240,7 @@ a {
 }
 .product-card__price {
   margin: 0;
-  color: var(--sp-color-muted);
+  color: var(--sp-price);
 }
 
 /* Filtros */

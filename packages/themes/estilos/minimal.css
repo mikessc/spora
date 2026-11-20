@@ -1,4 +1,4 @@
-/* Minimal: esquinas rectas, líneas finas, sin sombras, tipografía sobria. */
+/* Minimal: esquinas rectas, líneas finas, sin sombras, tipografía sobria. El secundario solo en las líneas y el pie; el acento, en las insignias. */
 :root {
   --sp-radius: 0px;
   --sp-radius-sm: 0px;
@@ -13,9 +13,19 @@
   --sp-heading-weight: 400;
   --sp-heading-transform: uppercase;
   --sp-heading-tracking: 0.08em;
-  --sp-button-fg: var(--sp-color-bg);
-  --sp-button-bg: var(--sp-color-fg);
-  --sp-hero-bg: var(--sp-color-bg);
   --sp-grid-min: 13rem;
   --sp-image-ratio: 1;
+  --sp-button-bg: var(--sp-color-primary);
+  --sp-button-fg: var(--sp-color-primary-fg);
+  --sp-header-bg: var(--sp-color-bg);
+  --sp-header-fg: var(--sp-color-fg);
+  --sp-header-border: var(--sp-color-secondary);
+  --sp-footer-bg: var(--sp-color-bg);
+  --sp-footer-fg: var(--sp-color-secondary-text);
+  --sp-hero-bg: var(--sp-color-bg);
+  --sp-hero-fg: var(--sp-color-fg);
+  --sp-badge-bg: var(--sp-color-accent);
+  --sp-badge-fg: var(--sp-color-accent-fg);
+  --sp-link: var(--sp-color-primary-text);
+  --sp-price: var(--sp-color-fg);
 }

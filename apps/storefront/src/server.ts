@@ -6,7 +6,7 @@ import { Hono } from "hono";
 import { renderToStringAsync } from "sibujs/ssr";
 import { type Ctx, type Env, type Page, registerAccountRoutes, shareSessionCookie } from "@spora/web";
 import { registerCheckoutRoutes } from "./checkout";
-import { documentHtml, sitemapXml, styleFor } from "./document";
+import { documentHtml, previewStore, sitemapXml, styleFor } from "./document";
 import { type PolicyPage, policyPages, Shell } from "./layout";
 import { CartPage, Listing, notFound, PolicyPageView, StoreIntro } from "./pages";
 import { ProductPage, productJsonLd } from "./product-page";
@@ -112,7 +112,12 @@ async function render(c: Ctx, page: Page) {
   );
   const canonical = `${url.origin}${url.pathname}`;
   return c.html(
-    documentHtml(store, styleFor(store, c.req.query("estilo")), { ...result.meta, canonical }, html),
+    documentHtml(
+      previewStore(store, { paleta: c.req.query("paleta"), fuente: c.req.query("fuente") }),
+      styleFor(store, c.req.query("estilo")),
+      { ...result.meta, canonical },
+      html,
+    ),
     (result.status ?? 200) as 200,
   );
 }

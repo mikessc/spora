@@ -49,7 +49,8 @@ export interface Store {
   name: string;
   currency: CurrencyCode;
   designStyle: string;
-  primaryColor: string | null;
+  /** Paleta de 5 roles (la valida @spora/themes al armar el CSS); null = la de Spora. */
+  palette: { primary: string; secondary: string; accent: string; background: string; text: string } | null;
   font: string;
   logo: string | null;
   tagline: string | null;
@@ -78,7 +79,11 @@ const STORE_QUERY = /* GraphQL */ `
       customFields {
         storeName
         designStyle
-        primaryColor
+        palettePrimary
+        paletteSecondary
+        paletteAccent
+        paletteBackground
+        paletteText
         font
         logo {
           preview
@@ -300,7 +305,15 @@ export function createShopClient({ url, channelToken, cookie, onSetCookie }: Sho
         name: f.storeName ?? c.token,
         currency: c.defaultCurrencyCode,
         designStyle: f.designStyle ?? "suave",
-        primaryColor: f.primaryColor ?? null,
+        palette: f.palettePrimary
+          ? {
+              primary: f.palettePrimary,
+              secondary: f.paletteSecondary ?? "",
+              accent: f.paletteAccent ?? "",
+              background: f.paletteBackground ?? "",
+              text: f.paletteText ?? "",
+            }
+          : null,
         font: f.font ?? "sistema",
         logo: f.logo?.preview ?? null,
         tagline: f.tagline ?? null,

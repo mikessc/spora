@@ -632,6 +632,28 @@ try {
   await save(originalTagline);
   ok("Panel Spora, Mi tienda: el comercio cambia la frase con updateStoreSettings y la tienda la muestra");
 
+  // Paleta de 5 colores: una sugerida, con vista previa en vivo y avisos de contraste; se guarda y la tienda la usa.
+  const roles = ["primary", "secondary", "accent", "background", "text"];
+  const originalPalette = await Promise.all(roles.map((role) => pc.inputValue(`#color-${role}`)));
+  await pc.getByRole("button", { name: /Circuito/ }).click();
+  await pc.waitForFunction(() =>
+    document.querySelector("#vista-previa")?.getAttribute("src")?.includes("paleta=2456d6"),
+  );
+  assert.match(await text(pc.locator("#avisos-contraste")), /se leen bien/);
+  await pc.fill("#color-text", "#dddddd");
+  assert.match(await text(pc.locator("#avisos-contraste")), /El texto casi no se lee sobre el fondo/);
+  await pc.getByRole("button", { name: /Circuito/ }).click();
+  await save(originalTagline);
+  const themed = await browser.newPage();
+  await themed.goto(`${STORE}/`);
+  assert.match(await themed.content(), /--sp-color-primary: #2456d6/);
+  await themed.close();
+  for (const [i, role] of roles.entries()) await pc.fill(`#color-${role}`, originalPalette[i]);
+  await save(originalTagline);
+  ok(
+    "Panel Spora, paleta: sugerida (Circuito), vista previa en vivo, aviso de contraste y la tienda la usa al guardar",
+  );
+
   // Marca y categoría global del producto: se eligen de una lista con búsqueda; el comercio propone una marca nueva y
   // el admin de Spora la ve en "Marcas" y la rechaza.
   const { data: shirt } = await adminApi(

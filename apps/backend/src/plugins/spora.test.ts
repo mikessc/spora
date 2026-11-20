@@ -247,10 +247,10 @@ describe("alta de comercio", () => {
 describe("tema de la tienda (M2)", () => {
   const UPDATE_THEME = gql`
     mutation ($style: String, $color: String, $secret: String) {
-      updateStoreSettings(input: { designStyle: $style, primaryColor: $color, trackingAppWebhookSecret: $secret }) {
+      updateStoreSettings(input: { designStyle: $style, palettePrimary: $color, trackingAppWebhookSecret: $secret }) {
         customFields {
           designStyle
-          primaryColor
+          palettePrimary
         }
       }
     }
@@ -282,8 +282,8 @@ describe("tema de la tienda (M2)", () => {
         color: "#c8102e",
         secret: "whsec_solo_de_prueba",
       });
-      assert.deepEqual(updateStoreSettings.customFields, { designStyle: "pop", primaryColor: "#c8102e" });
-      await assert.rejects(adminClient.query(UPDATE_THEME, { color: "rojo; }" }), /primaryColor/);
+      assert.deepEqual(updateStoreSettings.customFields, { designStyle: "pop", palettePrimary: "#c8102e" });
+      await assert.rejects(adminClient.query(UPDATE_THEME, { color: "rojo; }" }), /palettePrimary/);
       await assert.rejects(adminClient.query(UPDATE_THEME, { style: "barroco" }), /Estilo desconocido/);
     } finally {
       adminClient.setChannelToken(testConfig.defaultChannelToken ?? "e2e-default-channel");
