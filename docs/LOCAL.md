@@ -47,9 +47,11 @@ curl sin configurar nada.
 | Cliente nuevo | se crea en `/cuenta/registro` de cualquier tienda | |
 
 ## Tareas comunes
-- **Tema de la tienda:** Panel Spora → **Mi tienda**: estilo, color de marca, tipografía, logo, frase, textos,
-  políticas y credenciales de TrackingApp (mutation `updateStoreSettings`). El resto del canal (monedas, impuestos,
-  código) es del admin de Spora.
+- **Tema de la tienda:** Panel Spora → **Mi tienda**: paleta de 5 colores (con vista previa en vivo, avisos de
+  contraste, paletas sugeridas y sugerencia desde el logo; [ADR 0008](adr/0008-paleta-de-cinco-colores.md)), estilo,
+  tipografía, logo, frase, textos, políticas y credenciales de TrackingApp (mutation `updateStoreSettings`). El resto
+  del canal (monedas, impuestos, código) es del admin de Spora. La tienda acepta `?paleta=`, `?estilo=` y `?fuente=`
+  para previsualizar sin guardar.
 - **Dar de alta un comercio:** Admin API, como superadmin, mutation `registerStore` (crea comercio en estado
   `pendiente`, canal, bodega, rol y usuario). Para publicarla: Panel Spora → Configuración → Vendedores → Estado
   `activo`.
@@ -106,6 +108,6 @@ de pago y envío y el cliente de prueba con sus pedidos. Los productos están en
   La primera visita compila el panel y tarda unos segundos. Para la versión compilada:
   `pnpm --filter @spora/backend build` (queda en `apps/backend/dist/dashboard`).
 - Pantallas propias en `apps/backend/src/plugins/panel/dashboard/`: Mi tienda, Comisiones y, solo para el admin de
-  Spora, Disputas y Acuerdos de comisión. Ver [ADR 0007](adr/0007-vendure-dashboard.md).
+  Spora, Marcas, Disputas y Acuerdos de comisión. Ver [ADR 0007](adr/0007-vendure-dashboard.md).
 - **Cambiar el logo:** reemplazar `apps/backend/src/plugins/panel/dashboard/logo.svg` (se usa en el login, la barra
   lateral y el favicon). Los colores del panel están en `apps/backend/src/plugins/panel/theme.ts`.

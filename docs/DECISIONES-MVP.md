@@ -407,3 +407,58 @@ cómo revertirla.
   pedido al día en que se cierra. Solo entran pedidos hechos en el mes que se cierra o antes. Al cerrar se vuelve a
   revisar el pedido (cancelado o en disputa) por si el evento todavía no llegó al movimiento.
 - **Revertir:** `SPORA_DIAS_GRACIA_CIERRE` muy alto equivale a no facturar sin entrega.
+
+## Segunda ronda de correcciones (tras la prueba del MVP)
+
+### 2026-11-20 — SibuJS 4.15.3: fuera el workaround del SSR
+- **Decisión:** 4.15.3 corrige el SSR de `checked`, `selected` y `value` (PR #103). Se quitó `markIf` y los
+  componentes usan los atributos normales. El test canario pasó a ser de regresión
+  (`packages/ui/src/ssr-estado-formularios.test.ts`): radios, casillas, selects, inputs, textarea y nuestros filtros y
+  dirección; falla si el bug vuelve. sibujs-ui pasó a 1.10.1 (solo sube SibuJS).
+- **Revertir:** fijar 4.15.2 y volver a `markIf` (está en el historial).
+
+### 2026-11-20 — Panel Spora sobre el Vendure Dashboard (ADR 0007)
+- **Sin Admin UI en paralelo:** la guía sugiere correr ambos mientras se migra; aquí se quitó de una vez porque el
+  Dashboard cubre todo lo que se usaba y las pantallas propias se rehicieron.
+- **Cómo compila:** Vite corre con tsx y `module: "esm"`, porque el plugin del Dashboard carga nuestra config de
+  Vendure (ESM con imports sin extensión y `@spora/shared` en TypeScript). `vite build` pone `NODE_ENV=production`:
+  `SPORA_DASHBOARD_BUILD` evita que la config exija las variables de producción solo para sacar el esquema.
+- **Tipos:** `src/gql` (gql.tada) se versiona; el typecheck del panel informa solo los errores de nuestros archivos
+  (el Dashboard publica su código fuente en TypeScript y no compila con nuestra configuración estricta).
+- **Marca:** lo que el Dashboard no deja configurar se resolvió por extensión: logo de la barra lateral por CSS,
+  título de la pestaña y favicon con un provider, textos del login con un `.po`, idioma inicial en español (el
+  Dashboard arranca en inglés aunque se le diga otro idioma).
+- **El aviso "Vendure vX" se queda:** el código del Dashboard lo declara requisito de licencia (Vendure es GPLv3 o
+  licencia comercial) y lo protege. Todo lo demás es Spora. **Revertir:** con licencia comercial de Vendure.
+- **Al comercio se le ocultan** canales, bodega, configuración global y vendedores. Ocultar es presentación: el
+  servidor ya los rechazaba (permisos).
+- **Revertir:** volver al Admin UI clásico no tiene sentido (sin mantenimiento); las pantallas viven en
+  `src/plugins/panel/dashboard`.
+
+### 2026-11-20 — Marcas
+- **Decisión:** nuevo estado `rechazada` (`rejectBrand`, solo admin de Spora): los productos que la usaban quedan sin
+  marca y ya no se puede asignar; se puede volver a aprobar. El comercio propone desde el producto y puede usar la
+  marca propuesta enseguida (el marketplace solo muestra las aprobadas).
+- **Selector:** un buscador simple (campo + lista filtrada) en vez del combobox del Dashboard, cuya API cambia entre
+  versiones. La categoría muestra el camino completo ("Moda › Hombre › Camisetas").
+- **Revertir:** quitar `ui.component` de los custom fields vuelve al campo de texto.
+
+### 2026-11-20 — Disputas
+- **Decisión:** `resolveDeliveryDispute` (solo admin de Spora) con nota obligatoria, que queda en el historial del
+  pedido (privada). "Se entregó": entregado por el mismo servicio de envíos; la comisión pasa a facturable en el mes
+  de la resolución. "No se entregó": se cancela el pedido (la contra entrega no se cobra) y la comisión se anula. La
+  comisión se entera por un evento (`DeliveryDisputeResolvedEvent`).
+- **Límite:** si el pedido ya estaba **pagado** (SINPE liquidado, tarjeta), "No se entregó" lo cancela pero no
+  devuelve el dinero: la devolución se hace aparte (ver PROGRESO).
+
+### 2026-11-20 — Paleta de 5 colores (ADR 0008)
+- **Decisión:** 5 campos en el canal en lugar de `primaryColor`. De cada rol se derivan hover, tono suave, texto
+  legible encima (AA) y un tono para texto sobre el fondo; los enlaces y el precio usan ese tono, así un primario
+  claro no se vuelve ilegible.
+- **Avisos, no bloqueos:** el comercio ve qué combinación no se lee y decide. El acento solo avisa si casi no se
+  distingue del fondo (< 1.5): rellena insignias, y lo que tiene que leerse es el texto encima (garantizado AA).
+- **Vista previa:** la tienda real en un iframe con `?paleta=`, `?estilo=` y `?fuente=` (solo esa respuesta; lo
+  inválido se ignora). URL de la tienda: `STOREFRONT_URL` (`{tienda}` = subdominio).
+- **Desde el logo:** el panel agrupa los colores del logo en un canvas y `paletteFromColors` elige primario y acento.
+- **Migración:** paleta derivada del `primaryColor` de cada tienda (`paletteFromPrimary`).
+- **Revertir:** la migración tiene `down` (vuelve el primario a `primaryColor`).

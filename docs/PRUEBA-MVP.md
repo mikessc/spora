@@ -3,7 +3,10 @@
 Recorrido de punta a punta para revisar el MVP en local, como cliente, como comercio y como admin de Spora. Cada paso
 dice qué abrir, con qué usuario y qué debería ver. Toma unos 30 minutos.
 
-Lo mismo, automatizado, está en `pnpm e2e` (25 recorridos en Chrome).
+Lo mismo, automatizado, está en `pnpm e2e` (29 recorridos en Chrome).
+
+El panel del comercio y del admin de Spora es el **Panel Spora** (<http://localhost:3000/dashboard>): ingrese con
+los usuarios de abajo. La primera vez tarda unos segundos en compilar.
 
 ## 0. Arrancar desde cero
 Requisitos: Node ≥ 22.3, pnpm 9 y Docker Desktop abierto.
@@ -125,8 +128,15 @@ Use una ventana privada para comprar sin cuenta, o siga con el cliente de prueba
      tienda, igual que en producción.
 
 **Otras pantallas del comercio en el Panel Spora:**
-- **Mi tienda** (menú lateral): estilo, color, tipografía, logo, textos, políticas y credenciales de TrackingApp. Al
-  guardar, la tienda cambia enseguida.
+- **Mi tienda** (menú lateral):
+  - **Colores de la tienda**: los 5 colores (primario, secundario, acento, fondo y texto). Elija una de las 8
+    paletas sugeridas o pruebe colores propios: la **vista previa** de abajo es la tienda de verdad y cambia al
+    instante. Ponga un texto claro (#dddddd) y aparece el aviso "El texto casi no se lee sobre el fondo". Con un
+    logo elegido, **Sugerir a partir del logo** arma una paleta con sus colores.
+  - Estilo, tipografía, logo, textos, políticas y credenciales de TrackingApp. Al guardar, la tienda cambia
+    enseguida.
+- En un producto, **Categoría global** y **Marca** se eligen de una lista con búsqueda; escriba una marca que no
+  existe y aparece "Proponer la marca «…»".
 - **Configuración → Métodos de pago / de envío**: cada proveedor y sus credenciales, que se guardan cifradas.
 
 ## 6. Comisiones
@@ -144,7 +154,7 @@ Use una ventana privada para comprar sin cuenta, o siga con el cliente de prueba
    - **Debe ver** ese pedido **facturable** al 10 %, solo sobre los productos, **sin IVA ni envío** (el IVA es de Hacienda, no del comercio).
 3. Ingrese como `superadmin`.
    - **Debe ver** todas las tiendas y sus acuerdos, con el porcentaje vigente editable desde una fecha.
-   - **"Pedidos en disputa"**: los Audífonos de Voltio si el cliente dijo que no los recibió (paso 3). No se facturan.
+   - **Spora → Disputas**: los Audífonos de Voltio si el cliente dijo que no los recibió (paso 3). No se facturan.
      Escriba una nota (obligatoria) y elija **"Se entregó"** (el pedido pasa a entregado y su comisión a facturable)
      o **"No se entregó"** (se cancela el pedido y se anula la comisión). La nota queda en el historial del pedido.
    - **Cerrar el mes**: lo pendiente con 7 días o más (y sin cancelar ni en disputa) pasa a facturable con la marca
@@ -158,8 +168,6 @@ Como `superadmin` en el Panel Spora y en la Admin API:
 - **Spora → Marcas**: la marca "Artesanías del Sur" está **propuesta** y no aparece en el marketplace hasta
   aprobarla. Desde ahí se aprueba, se rechaza (los productos que la usaban quedan sin marca) o se fusiona con un
   duplicado.
-- En un producto (como comercio), **Categoría global** y **Marca** se eligen de una lista con búsqueda; escriba una
-  marca que no existe y aparece "Proponer la marca «…»".
 - **Alta de un comercio nuevo**: mutation `registerStore`. Crea canal, bodega, rol, usuario y los métodos de siempre
   (envío a domicilio, retiro y contra entrega).
 

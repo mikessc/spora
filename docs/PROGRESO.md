@@ -20,6 +20,43 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
   canal donde verificó; quitarlo como al registrarse.
 - **Avisar al cliente para que confirme la entrega:** un correo con "¿Recibiste tu pedido?" y los dos enlaces, para que
   los pedidos no dependan del cierre por días de gracia.
+- **Panel Spora compilado:** en producción se sirve la versión compilada (`pnpm --filter @spora/backend build` →
+  `apps/backend/dist/dashboard`), no el Vite de desarrollo. Revisar su peso: Vite avisa de bloques de más de 500 KB.
+- **Clickjacking:** proteger las tiendas con `frame-ancestors`, permitiendo el origen del Panel Spora (la vista previa
+  de "Mi tienda" incrusta la tienda en un iframe).
+- **Paleta desde el logo con recursos en un CDN:** el panel lee la imagen con un canvas; el dominio de los recursos debe
+  permitir CORS.
+- **Aviso "Vendure vX" en el panel:** lo exige la licencia GPL de Vendure; para quitarlo hace falta su licencia
+  comercial (ADR 0007).
+
+## 2026-11-20 — Segunda ronda de correcciones (tras la prueba del MVP) ✔
+- Hecho:
+  - **SibuJS 4.15.3:** corrige el SSR de `checked`, `selected` y `value`. Fuera el workaround; el test canario es
+    ahora de regresión. El JS del cliente bajó a 145 KB / 47 KB gzip en las tiendas y 34 KB / 12 KB en el marketplace.
+    Reporte marcado como resuelto; ADR 0002 al día.
+  - **Panel Spora** sobre el Vendure Dashboard (React), en <http://localhost:3000/dashboard>; fuera el Admin UI clásico
+    (sin mantenimiento desde julio de 2026). Marca Spora (nombre, logo provisional reemplazable, colores, español) y
+    menú propio: "Mi tienda", "Comisiones" y, solo para el admin de Spora, "Marcas", "Disputas" y "Acuerdos de
+    comisión". Al comercio se le ocultan las pantallas que no puede usar (canales, bodega, configuración global,
+    vendedores). `/panel/comisiones` y `/panel/tienda` redirigen. [ADR 0007](adr/0007-vendure-dashboard.md).
+  - **Marcas:** listado por estado; aprobar, rechazar y fusionar. En el producto, marca y categoría global se eligen
+    de una lista con búsqueda, y el comercio propone una marca nueva desde ahí.
+  - **Disputas:** el admin de Spora las resuelve con nota obligatoria: "Se entregó" (entregado, comisión facturable)
+    o "No se entregó" (pedido cancelado, comisión anulada).
+  - **Paleta de 5 colores** por tienda (primario, secundario, acento, fondo y texto) en lugar de `primaryColor`, con
+    tonos derivados y texto legible (WCAG AA), los 5 estilos usando los 5 roles, vista previa en vivo, avisos de
+    contraste, 8 paletas sugeridas por rubro y sugerencia desde el logo. Las tiendas existentes recibieron una paleta
+    derivada de su color; el seed usa 4 paletas distintas. [ADR 0008](adr/0008-paleta-de-cinco-colores.md).
+- Tests: `pnpm check` (44 tests de Vendure, regresión del SSR de SibuJS, paleta, vista previa). `pnpm e2e`
+  (29 recorridos) suma el Panel Spora: comisiones, Mi tienda con paleta y vista previa, marcas con búsqueda y
+  propuesta/rechazo, y resolución de disputas.
+- Cómo probarlo: [PRUEBA-MVP.md](PRUEBA-MVP.md) y [LOCAL.md](LOCAL.md).
+- Pendiente:
+  - **Devolver el dinero** de un pedido ya pagado que Spora resuelve como "No se entregó": hoy se cancela pero la
+    devolución se hace aparte.
+  - El comercio puede abrir por URL las pantallas de Vendure que se le ocultan (p. ej. Canales): las ve, pero el
+    servidor rechaza cualquier cambio.
+  - Los textos propios de Vendure en el panel siguen la traducción de Vendure (p. ej. "Perspectivas" para Insights).
 
 ## 2026-11-19 — Correcciones post-MVP ✔
 - Hecho:
@@ -43,8 +80,8 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
 - Pendiente:
   - **Resolver disputas:** hoy el admin de Spora las ve, pero no hay una acción para cerrarlas (facturar o anular);
     se hace a mano.
-  - En el Admin UI el comercio todavía ve el formulario del canal con "Guardar", que ahora responde "no autorizado":
-    ocultarlo con una extensión del Admin UI.
+  - ~~En el Admin UI el comercio todavía ve el formulario del canal con "Guardar"~~: resuelto con el Panel Spora
+    (2026-11-20).
 
 ## 2026-11-19 — M7: datos de ejemplo, pruebas de punta a punta y guía ✔ — **MVP completo**
 - Hecho:
