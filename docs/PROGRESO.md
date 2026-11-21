@@ -7,7 +7,9 @@ Cosas que funcionan en local pero hay que resolver antes de poner Spora en líne
 - **Peso del JS del cliente:** **145 KB minificado / 47 KB gzip** por página en las tiendas y 34 KB / 12 KB gzip en
   el marketplace (medido el 2026-11-20 con SibuJS 4.15.3, que arregló su tree-shaking; antes 171 KB / 58 KB y 114 KB).
   Lo que más pesa de lo que queda: 27 KB de `tailwind-merge`, que arrastra sibujs-ui. Opción: no usar sibujs-ui
-  dentro de las islas.
+  dentro de las islas. Desglose y cambios propuestos a SibuJS y sibujs-ui (hasta 41,7 KB gzip en las tiendas y
+  ~6 KB en el marketplace) en [reportes/sibujs-peso-bundle.md](reportes/sibujs-peso-bundle.md). De nuestro lado, el
+  nomenclátor de CR (21 KB) entra al JS de las tiendas sin usarse.
 - **Meilisearch:** el marketplace usa la llave maestra en local; en línea, una llave de solo búsqueda
   (`MEILI_SEARCH_KEY`) y otra con escritura solo para el backend.
 - **CSS completo de sibujs-ui (116 KB, incluye Preflight):** se carga entero porque no compilamos Tailwind. Compilar
