@@ -3,8 +3,10 @@ import { Args, Mutation, Query, Resolver } from "@nestjs/graphql";
 import {
   Allow,
   Asset,
+  ChannelService,
   ConfigService,
   Ctx,
+  type ID,
   LanguageCode,
   Permission,
   PluginCommonModule,
@@ -14,6 +16,7 @@ import {
 } from "@vendure/core";
 import { designStyles, fonts, paletteLabels, paletteRoles } from "@spora/themes";
 import type { NextFunction, Request, Response } from "express";
+import type { ChannelListOptions } from "@vendure/common/lib/generated-types";
 import { DEFAULT_CHANNEL_CODE } from "@vendure/common/lib/shared-constants";
 import gql from "graphql-tag";
 import {
@@ -123,9 +126,35 @@ const adminApi = gql`
   }
 `;
 
+/** Canales del usuario si no es admin de Spora; `null` = todos. */
+const ownChannelIds = (ctx: RequestContext) =>
+  ctx.userHasPermissions([Permission.SuperAdmin])
+    ? null
+    : (ctx.session?.user?.channelPermissions ?? []).map((c) => String(c.id));
+
 @Resolver()
 class StoreAdminResolver {
-  constructor(@Inject(StoreService) private stores: StoreService) {}
+  constructor(
+    @Inject(StoreService) private stores: StoreService,
+    @Inject(ChannelService) private channelService: ChannelService,
+  ) {}
+
+  // Sobrescriben los de Vendure, que devuelven todos los canales a quien tenga ReadChannel. El Dashboard pide
+  // `channels` para la moneda e idioma del canal, así que el comercio conserva ReadChannel pero solo ve el suyo.
+  // ponytail: al comercio se le ignoran filtros y paginación (tiene un canal); pasarlos si algún día tiene varios.
+  @Query()
+  @Allow(Permission.ReadSettings, Permission.ReadChannel)
+  channels(@Ctx() ctx: RequestContext, @Args() args: { options?: ChannelListOptions }) {
+    const own = ownChannelIds(ctx);
+    return this.channelService.findAll(ctx, own ? { filter: { id: { in: own } } } : (args.options ?? undefined));
+  }
+
+  @Query()
+  @Allow(Permission.ReadSettings, Permission.ReadChannel)
+  channel(@Ctx() ctx: RequestContext, @Args() args: { id: ID }) {
+    const own = ownChannelIds(ctx);
+    return own && !own.includes(String(args.id)) ? null : this.channelService.findOne(ctx, args.id);
+  }
 
   @Mutation()
   @Transaction()

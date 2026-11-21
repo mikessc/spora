@@ -269,6 +269,7 @@ describe("tema de la tienda (M2)", () => {
           id
           code
         }
+        totalItems
       }
     }
   `;
@@ -335,6 +336,74 @@ describe("tema de la tienda (M2)", () => {
         adminClient.setChannelToken(token);
         await assert.rejects(adminClient.query(UPDATE_THEME, { style: "pop" }), /not currently authorized/);
       }
+    } finally {
+      adminClient.setChannelToken(testConfig.defaultChannelToken ?? "e2e-default-channel");
+      await adminClient.asSuperAdmin();
+    }
+  });
+
+  test("lo que el comercio ve por la Admin API: solo su canal, sin credenciales; lo global de Spora, solo lectura", async () => {
+    const { channels } = await adminClient.query(CHANNEL_IDS);
+    const id = (code: string) => channels.items.find((c: { code: string }) => c.code === code).id;
+    const CHANNEL = gql`
+      query ($id: ID!) {
+        channel(id: $id) {
+          code
+          customFields {
+            trackingAppKey
+            trackingAppWebhookSecret
+          }
+        }
+      }
+    `;
+    const denied = (query: string) => assert.rejects(adminClient.query(gql(query)), /not currently authorized/);
+
+    await adminClient.asUserWithCredentials(admin.emailAddress, admin.password);
+    adminClient.setChannelToken("cafe-sur");
+    try {
+      const mine = await adminClient.query(CHANNEL_IDS);
+      assert.deepEqual(
+        mine.channels.items.map((c: { code: string }) => c.code),
+        ["cafe-sur"],
+      );
+      assert.equal(mine.channels.totalItems, 1);
+      for (const code of ["otra-tienda", "__default_channel__"]) {
+        assert.equal((await adminClient.query(CHANNEL, { id: id(code) })).channel, null, code);
+      }
+      // Credenciales de TrackingApp: ni en claro ni cifradas; las cambia solo por updateStoreSettings.
+      const own = await adminClient.query(CHANNEL, { id: id("cafe-sur") });
+      assert.deepEqual(own.channel, {
+        code: "cafe-sur",
+        customFields: { trackingAppKey: null, trackingAppWebhookSecret: null },
+      });
+
+      await denied(`{ sellers { items { id } } }`);
+      await denied(`{ jobs { items { id } } }`);
+      await denied(`{ administrators { items { id } } }`);
+
+      // Configuración global de Spora: la ve (el Dashboard la usa para impuestos y direcciones), no la cambia.
+      const global = await adminClient.query(gql`
+        {
+          globalSettings {
+            availableLanguages
+          }
+          zones {
+            items {
+              name
+            }
+          }
+          taxRates {
+            items {
+              name
+            }
+          }
+        }
+      `);
+      assert.ok(global.globalSettings.availableLanguages.includes("es"));
+      assert.ok(global.zones.items.some((z: { name: string }) => z.name === "Costa Rica"));
+      assert.ok(global.taxRates.items.length > 0);
+      await denied(`mutation { updateGlobalSettings(input: { trackInventory: false }) { __typename } }`);
+      await denied(`mutation { createZone(input: { name: "Mía" }) { id } }`);
     } finally {
       adminClient.setChannelToken(testConfig.defaultChannelToken ?? "e2e-default-channel");
       await adminClient.asSuperAdmin();

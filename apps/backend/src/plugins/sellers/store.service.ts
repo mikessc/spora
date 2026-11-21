@@ -78,7 +78,14 @@ export const SELLER_PERMISSIONS: Permission[] = [
   Permission.UpdateShippingMethod,
   Permission.DeleteShippingMethod,
   Permission.ReadStockLocation,
-  Permission.ReadSettings,
+  // Lo global de Spora que usa el Dashboard, solo lectura. No ReadSettings: también abre la cola de trabajos, que es de
+  // todas las tiendas.
+  Permission.ReadCountry,
+  Permission.ReadZone,
+  Permission.ReadTaxCategory,
+  Permission.ReadTaxRate,
+  Permission.ReadTag,
+  // channels y channel le devuelven solo su canal (StoreAdminResolver).
   Permission.ReadChannel,
   updateStoreSettingsPermission.Permission,
 ];

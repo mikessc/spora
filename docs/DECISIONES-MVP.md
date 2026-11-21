@@ -462,3 +462,16 @@ cómo revertirla.
 - **Desde el logo:** el panel agrupa los colores del logo en un canvas y `paletteFromColors` elige primario y acento.
 - **Migración:** paleta derivada del `primaryColor` de cada tienda (`paletteFromPrimary`).
 - **Revertir:** la migración tiene `down` (vuelve el primario a `primaryColor`).
+
+### 2026-11-20 — Qué ve un comercio por la Admin API
+- **Hallazgo:** con `ReadChannel` y `ReadSettings`, `channels` y `channel(id)` le devolvían todos los canales,
+  con las credenciales de TrackingApp ya descifradas. `ReadSettings` además abría la cola de trabajos, que es de
+  todas las tiendas.
+- **Decisión:** el comercio conserva `ReadChannel`, porque el Dashboard pide `channels` para la moneda y el idioma
+  del canal; sin él, toma USD por defecto. `channels` y `channel` se sobrescriben y solo le devuelven sus canales.
+  `ReadSettings` se cambia por `ReadCountry`, `ReadZone`, `ReadTaxCategory`, `ReadTaxRate` y `ReadTag`. Zonas,
+  impuestos y `globalSettings` son de Spora: los lee, no los cambia. `sellers` sigue cerrado (no tiene `ReadSeller`).
+- **Credenciales:** `trackingAppKey` y `trackingAppWebhookSecret` llevan `requiresPermission: SuperAdmin`, así que
+  al comercio le llegan en `null`. Las cambia solo con `updateStoreSettings`, que guarda como admin de Spora.
+- **Revertir:** devolver `ReadSettings` a `SELLER_PERMISSIONS` y quitar los dos resolvers de `StoreAdminResolver`.
+  Los roles se sincronizan al arrancar.

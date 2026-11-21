@@ -564,12 +564,15 @@ class ShippingAdminResolver {
       subscribers: [...((config.dbConnectionOptions.subscribers as []) ?? []), ChannelSecrets],
     };
     const tab = { tab: "Envíos" };
+    // Solo el admin de Spora las lee o escribe por la Admin API (el comercio ni cifradas las ve); el comercio las cambia
+    // con updateStoreSettings.
     config.customFields.Channel.push(
       {
         name: "trackingAppKey",
         type: "string",
         nullable: true,
         public: false,
+        requiresPermission: Permission.SuperAdmin,
         label: es("Llave de cliente de TrackingApp"),
         description: es("Con permisos shipments:write y packages:read. Se guarda cifrada."),
         ui: { ...tab, component: "password-form-input" },
@@ -579,6 +582,7 @@ class ShippingAdminResolver {
         type: "string",
         nullable: true,
         public: false,
+        requiresPermission: Permission.SuperAdmin,
         label: es("Secreto del webhook de TrackingApp"),
         description: es("El whsec_… del endpoint que registró en TrackingApp. Se guarda cifrado."),
         ui: { ...tab, component: "password-form-input" },
